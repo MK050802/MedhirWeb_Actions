@@ -209,6 +209,7 @@ const AssetDetailPage = () => {
     const [uploadingDoc, setUploadingDoc] = useState(false);
     const [editingOverview, setEditingOverview] = useState(false);
     const [overviewDraft, setOverviewDraft] = useState({
+        categoryId: '',
         serialNumber: '',
         statusLabelId: '',
         purchaseDate: '',
@@ -293,22 +294,6 @@ const AssetDetailPage = () => {
             if (!statuses || statuses.length === 0) dispatch(fetchAssetStatuses());
         }
     }, [editingOverview, categories, statuses, dispatch]);
-    
-    // Debug: Log asset object when it's loaded
-    useEffect(() => {
-        if (asset) {
-            console.log('Asset loaded:', asset);
-            console.log('Asset fields:', Object.keys(asset));
-            console.log('Asset subcategory fields:', {
-                subCategoryId: asset.subCategoryId,
-                subcategoryId: asset.subcategoryId,
-                sub_category_id: asset.sub_category_id,
-                subcategory_id: asset.subcategory_id,
-                subCategory: asset.subCategory,
-                subcategory: asset.subcategory
-            });
-        }
-    }, [asset]);
     
     // Handle errors with toast notifications
     useEffect(() => {
@@ -969,6 +954,7 @@ const AssetDetailPage = () => {
     const startOverviewEditing = () => {
         if (!asset) return;
         setOverviewDraft({
+            categoryId: asset.categoryId || '',
             serialNumber: asset.serialNumber || '',
             statusLabelId: asset.statusLabelId || '',
             purchaseDate: asset.purchaseDate ? new Date(asset.purchaseDate).toISOString().slice(0, 10) : '',
@@ -986,6 +972,7 @@ const AssetDetailPage = () => {
         try {
             setSavingOverview(true);
             const payload = {};
+            if (overviewDraft.categoryId !== (asset.categoryId || '')) payload.categoryId = overviewDraft.categoryId || null;
             if (overviewDraft.serialNumber !== (asset.serialNumber || '')) payload.serialNumber = overviewDraft.serialNumber || null;
             if (overviewDraft.statusLabelId !== (asset.statusLabelId || '')) payload.statusLabelId = overviewDraft.statusLabelId || null;
             if (overviewDraft.purchaseDate !== (asset.purchaseDate ? new Date(asset.purchaseDate).toISOString().slice(0, 10) : '')) payload.purchaseDate = overviewDraft.purchaseDate || null;
@@ -1197,34 +1184,6 @@ const AssetDetailPage = () => {
             </AssetManagementLayout>
         );
     }
-    
-    // Helper to get subcategory name from asset
-    const getSubcategoryName = (assetObj) => {
-        if (!assetObj) return 'No Asset Data';
-        
-        // Debug: Log the asset object to see what fields are available
-        console.log('Asset object in getSubcategoryName:', assetObj);
-        console.log('Available fields:', Object.keys(assetObj));
-        
-        // Check for different possible subcategory field names
-        const subcategoryId = assetObj.subCategoryId || assetObj.subcategoryId || assetObj.sub_category_id || assetObj.subcategory_id || assetObj.subCategory || assetObj.subcategory;
-        
-        console.log('Subcategory ID found:', subcategoryId);
-        
-        if (!subcategoryId) return 'No Subcategory';
-        
-        if (!Array.isArray(categories) || categories.length === 0) return 'Loading...';
-        
-        for (const cat of categories) {
-            if (Array.isArray(cat.subCategories)) {
-                const subcat = cat.subCategories.find(
-                    s => (s.subCategoryId || s.id) === subcategoryId
-                );
-                if (subcat) return subcat.name || 'Unknown Subcategory';
-            }
-        }
-        return 'Unknown Subcategory';
-    };
     
     return (
         <AssetManagementLayout>
@@ -1494,11 +1453,33 @@ const AssetDetailPage = () => {
                                             </div>
                                             <div className="flex justify-between items-center gap-4">
                                                 <span className="text-gray-600">Category:</span>
+                                                {editingOverview ? (
+                                                    <select
+                                                        value={overviewDraft.categoryId}
+                                                        onChange={(e) => setOverviewDraft(v => ({ ...v, categoryId: e.target.value }))}
+                                                        className="p-2 border rounded-md min-w-[200px]"
+                                                    >
+                                                        <option value="">Select Category...</option>
+                                                        {Array.isArray(categories) && categories.map(c => (
+                                                            <option key={c.categoryId || c.id} value={c.categoryId || c.id}>{c.name}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
                                                 <span className="font-medium">{getCategoryName(asset.categoryId)}</span>
+                                                )}
                                             </div>
                                             <div className="flex justify-between items-center gap-4">
-                                                <span className="text-gray-600">Subcategory:</span>
-                                                <span className="font-medium">{getSubcategoryName(asset)}</span>
+                                                <span className="text-gray-600">Serial Number:</span>
+                                                {editingOverview ? (
+                                                    <input
+                                                        className="p-2 border rounded-md min-w-[200px]"
+                                                        value={overviewDraft.serialNumber}
+                                                        onChange={(e) => setOverviewDraft(v => ({ ...v, serialNumber: e.target.value }))}
+                                                        placeholder="Serial Number"
+                                                    />
+                                                ) : (
+                                                <span className="font-medium">{asset.serialNumber || 'N/A'}</span>
+                                                )}
                                             </div>
                                             <div className="flex justify-between items-center gap-4">
                                                 <span className="text-gray-600">Status:</span>
@@ -1596,69 +1577,7 @@ const AssetDetailPage = () => {
                                         <button onClick={startSpecsEditing} className="px-3 py-1 text-sm border rounded-md text-gray-700 hover:bg-gray-50 flex items-center gap-2"><FaEdit /> Edit Specifications</button>
                                     )}
                                 </div>
-                                {getCategoryName(asset.categoryId) === 'IT Equipment' && (
-                                  <>
-                                    <h3 className="text-lg font-semibold text-gray-800">Specifications</h3>
-                                    <div className="space-y-3 mt-2">
-                                      <div className="flex justify-between items-center gap-4">
-                                        <span className="text-gray-600">Brand:</span>
-                                        {editingSpecs ? (
-                                          <input className="p-2 border rounded-md min-w-[200px]" value={specsDraft.customFields?.laptopCompany || ''} onChange={(e) => setSpecsDraft(v => ({ ...v, customFields: { ...v.customFields, laptopCompany: e.target.value } }))} />
-                                        ) : (
-                                          <span className="font-medium">{asset.customFields?.laptopCompany || 'N/A'}</span>
-                                        )}
-                                      </div>
-                                      <div className="flex justify-between items-center gap-4">
-                                        <span className="text-gray-600">Processor:</span>
-                                        {editingSpecs ? (
-                                          <input className="p-2 border rounded-md min-w-[200px]" value={specsDraft.customFields?.processor || ''} onChange={(e) => setSpecsDraft(v => ({ ...v, customFields: { ...v.customFields, processor: e.target.value } }))} />
-                                        ) : (
-                                          <span className="font-medium">{asset.customFields?.processor || 'N/A'}</span>
-                                        )}
-                                      </div>
-                                      <div className="flex justify-between items-center gap-4">
-                                        <span className="text-gray-600">RAM:</span>
-                                        {editingSpecs ? (
-                                          <input className="p-2 border rounded-md min-w-[200px]" value={specsDraft.customFields?.ram || ''} onChange={(e) => setSpecsDraft(v => ({ ...v, customFields: { ...v.customFields, ram: e.target.value } }))} />
-                                        ) : (
-                                          <span className="font-medium">{asset.customFields?.ram || 'N/A'}</span>
-                                        )}
-                                      </div>
-                                      <div className="flex justify-between items-center gap-4">
-                                        <span className="text-gray-600">Storage:</span>
-                                        {editingSpecs ? (
-                                          <input className="p-2 border rounded-md min-w-[200px]" value={specsDraft.customFields?.memory || ''} onChange={(e) => setSpecsDraft(v => ({ ...v, customFields: { ...v.customFields, memory: e.target.value } }))} />
-                                        ) : (
-                                          <span className="font-medium">{asset.customFields?.memory || 'N/A'}</span>
-                                        )}
-                                      </div>
-                                      <div className="flex justify-between items-center gap-4">
-                                        <span className="text-gray-600">Graphics Card:</span>
-                                        {editingSpecs ? (
-                                          <input className="p-2 border rounded-md min-w-[200px]" value={specsDraft.customFields?.graphicsCard || ''} onChange={(e) => setSpecsDraft(v => ({ ...v, customFields: { ...v.customFields, graphicsCard: e.target.value } }))} />
-                                        ) : (
-                                          <span className="font-medium">{asset.customFields?.graphicsCard || 'N/A'}</span>
-                                        )}
-                                      </div>
-                                      <div className="flex justify-between items-center gap-4">
-                                        <span className="text-gray-600">Team:</span>
-                                        {editingSpecs ? (
-                                          <input className="p-2 border rounded-md min-w-[200px]" value={specsDraft.customFields?.team || ''} onChange={(e) => setSpecsDraft(v => ({ ...v, customFields: { ...v.customFields, team: e.target.value } }))} />
-                                        ) : (
-                                          <span className="font-medium">{asset.customFields?.team || 'N/A'}</span>
-                                        )}
-                                      </div>
-                                      <div className="flex justify-between items-start gap-4">
-                                        <span className="text-gray-600">Accessories:</span>
-                                        {editingSpecs ? (
-                                          <textarea className="p-2 border rounded-md min-w-[200px] w-full max-w-xl" rows="3" value={specsDraft.customFields?.accessories || ''} onChange={(e) => setSpecsDraft(v => ({ ...v, customFields: { ...v.customFields, accessories: e.target.value } }))} />
-                                        ) : (
-                                          <span className="font-medium text-gray-700">{asset.customFields?.accessories || 'N/A'}</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </>
-                                )}
+
 
                                 {/* Generic specifications from formData */}
                                 {asset.formData && Object.keys(asset.formData).length > 0 && (

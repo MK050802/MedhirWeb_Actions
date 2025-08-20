@@ -6,64 +6,6 @@ const { publicRuntimeConfig } = getConfig();
 
 const ASSET_API_BASE = publicRuntimeConfig.apiURL + "/api/assets";
 
-// Helper function to check API connectivity
-export const checkAssetApiHealth = async () => {
-  try {
-    const baseUrl = publicRuntimeConfig.apiURL;
-    console.log('Checking Asset API health at:', baseUrl);
-    
-    const response = await axios.get(`${baseUrl}/health`, { 
-      timeout: 5000,
-      validateStatus: function (status) {
-        return status < 500;
-      }
-    });
-    
-    console.log('Asset API Health Check Response:', response.status);
-    return { isHealthy: true, status: response.status };
-  } catch (error) {
-    console.error('Asset API Health Check Failed:', {
-      message: error.message,
-      code: error.code,
-      url: error.config?.url
-    });
-    return { 
-      isHealthy: false, 
-      error: error.message,
-      code: error.code 
-    };
-  }
-};
-
-// Helper function to make API requests with retry logic
-const makeApiRequestWithRetry = async (requestFn, maxRetries = 2) => {
-  let lastError;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`API request attempt ${attempt}/${maxRetries}`);
-      return await requestFn();
-    } catch (error) {
-      lastError = error;
-      console.warn(`API request attempt ${attempt} failed:`, error.message);
-      
-      // Only retry on network errors, not server errors
-      if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
-        if (attempt < maxRetries) {
-          console.log(`Retrying in ${attempt * 1000}ms...`);
-          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
-          continue;
-        }
-      }
-      
-      // Don't retry for other types of errors
-      break;
-    }
-  }
-  
-  throw lastError;
-};
-
 /**
  * ASSET MANAGEMENT ENDPOINTS (Based on AssetController.java):
  * 
@@ -151,26 +93,14 @@ export const fetchAllAssets = createAsyncThunk(
       let response;
       try {
         console.log('Trying standard endpoint...');
-        response = await makeApiRequestWithRetry(async () => {
-          return await axios.get(`${ASSET_API_BASE}`, { 
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 10000, // 10 second timeout
-            validateStatus: function (status) {
-              return status < 500; // Accept all status codes less than 500
-            }
-          });
+        response = await axios.get(`${ASSET_API_BASE}`, { 
+          headers: { Authorization: `Bearer ${token}` } 
         });
         console.log('Standard endpoint succeeded');
       } catch (standardError) {
         console.log('Standard endpoint failed, trying enhanced endpoint...');
-        response = await makeApiRequestWithRetry(async () => {
-          return await axios.get(`${ASSET_API_BASE}/enhanced`, { 
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 10000, // 10 second timeout
-            validateStatus: function (status) {
-              return status < 500; // Accept all status codes less than 500
-            }
-          });
+        response = await axios.get(`${ASSET_API_BASE}/enhanced`, { 
+          headers: { Authorization: `Bearer ${token}` } 
         });
         console.log('Enhanced endpoint succeeded');
       }
@@ -179,38 +109,7 @@ export const fetchAllAssets = createAsyncThunk(
       return response.data;
     } catch (error) {
       console.error('Error fetching all assets:', error);
-      
-      // Handle different types of errors
-      if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
-        console.error('Network error - API server may be down:', {
-          code: error.code,
-          message: error.message,
-          url: `${ASSET_API_BASE}`
-        });
-        return rejectWithValue('Network error: Unable to connect to the server. Please check your internet connection and try again.');
-      }
-      
-      if (error.response) {
-        // Server responded with error status
-        console.error('Server error response:', {
-          status: error.response.status,
-          data: error.response.data,
-          headers: error.response.headers
-        });
-        return rejectWithValue(error.response.data?.message || `Server error: ${error.response.status}`);
-      }
-      
-      if (error.request) {
-        // Request was made but no response received
-        console.error('No response received:', {
-          request: error.request,
-          message: error.message
-        });
-        return rejectWithValue('No response from server. Please check if the API server is running.');
-      }
-      
-      // Generic error
-      return rejectWithValue(error.message || 'Failed to fetch assets');
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch assets');
     }
   }
 );
@@ -221,54 +120,15 @@ export const fetchAllAssetsDetailed = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = getItemFromSessionStorage('token', null);
-      
-      // Add timeout and better error handling with retry
-      const response = await makeApiRequestWithRetry(async () => {
-        return await axios.get(`${ASSET_API_BASE}/detailed`, { 
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000, // 10 second timeout
-          validateStatus: function (status) {
-            return status < 500; // Accept all status codes less than 500
-          }
-        });
+      const response = await axios.get(`${ASSET_API_BASE}/detailed`, { 
+        headers: { Authorization: `Bearer ${token}` } 
       });
       
       console.log('Fetch all assets detailed response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching all assets detailed:', error);
-      
-      // Handle different types of errors
-      if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
-        console.error('Network error - API server may be down:', {
-          code: error.code,
-          message: error.message,
-          url: `${ASSET_API_BASE}/detailed`
-        });
-        return rejectWithValue('Network error: Unable to connect to the server. Please check your internet connection and try again.');
-      }
-      
-      if (error.response) {
-        // Server responded with error status
-        console.error('Server error response:', {
-          status: error.response.status,
-          data: error.response.data,
-          headers: error.response.headers
-        });
-        return rejectWithValue(error.response.data?.message || `Server error: ${error.response.status}`);
-      }
-      
-      if (error.request) {
-        // Request was made but no response received
-        console.error('No response received:', {
-          request: error.request,
-          message: error.message
-        });
-        return rejectWithValue('No response from server. Please check if the API server is running.');
-      }
-      
-      // Generic error
-      return rejectWithValue(error.message || 'Failed to fetch detailed assets');
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch detailed assets');
     }
   }
 );

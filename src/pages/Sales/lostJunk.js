@@ -20,9 +20,9 @@ const LostJunkPage = () => {
 
   useEffect(() => {
     if (isManager) {
-      dispatch(fetchLeads());
+      dispatch(fetchLeads({all: true}));
     } else {
-      dispatch(fetchLeads({ employeeId: employeeId }));
+      dispatch(fetchLeads({ employeeId: employeeId, all: true }));
     }
   }, [dispatch, isManager, employeeId]);
 
@@ -39,8 +39,12 @@ const LostJunkPage = () => {
   return (
     <MainLayout>
       <div className="h-full bg-gray-50">
-        
-        <LostJunkLeadsView isManager={isManager} />
+        <LostJunkLeadsView 
+          isManager={isManager} 
+          dateFilterProps={{ startDate, endDate }}
+          onFilterChange={handleFilterChange}
+          onResetFilter={handleResetFilter}
+        />
       </div>
     </MainLayout>
   );

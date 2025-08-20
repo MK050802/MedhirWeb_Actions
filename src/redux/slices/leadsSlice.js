@@ -10,6 +10,12 @@ const token = getItemFromSessionStorage("token", null);
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+// Get first date of current month + 1 day
+const currentDate = new Date();
+const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 2).toISOString().split('T')[0];
+// Get last date of current month + 1 day
+const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1).toISOString().split('T')[0];
+
 export const fetchLeads = createAsyncThunk(
   'leads/fetchLeads',
   async (params = {}, { rejectWithValue }) => {
@@ -17,11 +23,19 @@ export const fetchLeads = createAsyncThunk(
         const companyId = sessionStorage.getItem("employeeCompanyId");
         
         let url = `${API_BASE_URL}/leads/kanban-cards/${companyId}`;
+
+        console.log('startDate', startDate);
+        console.log('endDate', endDate);
         
         // Only add employeeId filter if explicitly provided (for Lead Management)
         // Manager pages will call fetchLeads() without params to get all leads
         if (params.employeeId) {
           url += `?assignedSalesRep=${params.employeeId}`;
+        }
+
+        if (!params.all) {
+          const separator = params.employeeId ? '&' : '?';
+          url += `${separator}startDate=${startDate}&endDate=${endDate}`;
         }
         
         const res = await axios.get(url, {
@@ -33,6 +47,8 @@ export const fetchLeads = createAsyncThunk(
     }
   }
 );
+
+
 
 export const fetchLeadById = createAsyncThunk(
     "leads/fetchLeadById",

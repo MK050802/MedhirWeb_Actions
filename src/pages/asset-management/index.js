@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AssetManagementLayout from '@/components/AssetManagementLayout';
-import { FaPlus, FaTimes, FaFileInvoice, FaIdCard, FaSync } from 'react-icons/fa';
+import { FaPlus, FaTimes, FaIdCard, FaSync } from 'react-icons/fa';
 import { toast } from 'sonner';
 import { useRouter } from 'next/router';
 import { useDispatch, useSelector } from 'react-redux';
@@ -8,14 +8,9 @@ import withAuth from '@/components/withAuth';
 import { fetchAssetCategories } from '@/redux/slices/assetCategorySlice';
 import { fetchAssetLocations } from '@/redux/slices/assetLocationSlice';
 import { fetchAssetStatuses } from '@/redux/slices/assetStatusSlice';
-import { createAssetWithDTO, fetchAllAssets } from '@/redux/slices/assetSlice';
+import { createAssetWithDTO, fetchAllAssets, patchAssetByAssetId } from '@/redux/slices/assetSlice';
 import { fetchCustomFormsByCategory } from '@/redux/slices/customFormsSlice';
-import { 
-    generateAssetId, 
-    getSubcategoriesForCategory, 
-    getNextSequenceNumber,
-    SUBCATEGORIES 
-} from '@/utils/assetIdGenerator';
+
 import getConfig from 'next/config';
 import { getItemFromSessionStorage } from '@/redux/slices/sessionStorageSlice';
 
@@ -26,8 +21,7 @@ import { getItemFromSessionStorage } from '@/redux/slices/sessionStorageSlice';
 //     { id: 'ASSET-2024-0003', name: 'HP LaserJet Pro MFP', category: 'IT Equipment', status: 'Under Maintenance', location: 'Bangalore Branch', assignedTo: null },
 // ];
 
-const MOCK_TEAMS = ['Marketing', 'Production', 'Sales', 'HR', 'Finance'];
-const MOCK_LAPTOP_COMPANIES = ['Dell', 'HP', 'Lenovo', 'Apple', 'Asus', 'Acer'];
+
 
 // Input and Select components defined outside to prevent re-creation on each render
 const InputField = ({ label, name, value, onChange, type, error, ...props }) => {
@@ -301,20 +295,12 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
         gstRate: '', 
         invoiceScan: null,
         warrantyExpiry: '',
-        // IT Specific Fields
-        team: '', 
-        laptopCompany: '', 
-        processor: '', 
-        ram: '', 
-        memory: '', 
-        condition: 'New', 
-        accessories: '', 
-        graphicsCard: '',
+
         // Additional fields that might be needed
         statusLabelId: ''
     });
 
-    const [showITFields, setShowITFields] = useState(false);
+
     const [generatedAssetId, setGeneratedAssetId] = useState('');
     const { publicRuntimeConfig } = getConfig();
     const [availableSubcategories, setAvailableSubcategories] = useState([]);
@@ -374,8 +360,6 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
     }, [isOpen, dispatch]);
 
     useEffect(() => {
-        setShowITFields(formData.category === 'IT Equipment');
-        
         // Update available subcategories when category changes
         if (formData.category && Array.isArray(categories)) {
             // Find the selected category from the fetched categories
@@ -646,7 +630,7 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
                 subcategoryId: subcategoryData?.subCategoryId || subcategoryData?.id,
                 locationId: formData.location || null,
                 statusLabelId: formData.statusLabelId || null,
-                assignedToTeam: formData.team || null,
+
                 purchaseDate: formData.purchaseDate || null,
                 purchaseCost: formData.purchaseCost ? parseFloat(formData.purchaseCost) : null,
                 invoiceNumber: formData.invoiceNumber || null,
@@ -717,15 +701,7 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
                 }];
             }
             
-            // Also add the static form fields (IT Equipment fields, etc.)
-            if (formData.processor) assetData.processor = formData.processor;
-            if (formData.ram) assetData.ram = formData.ram;
-            if (formData.memory) assetData.memory = formData.memory;
-            if (formData.graphicsCard) assetData.graphicsCard = formData.graphicsCard;
-            if (formData.laptopCompany) assetData.laptopCompany = formData.laptopCompany;
-            if (formData.condition) assetData.condition = formData.condition;
-            if (formData.accessories) assetData.accessories = formData.accessories;
-            if (formData.team) assetData.assignedToTeam = formData.team;
+
 
             
             // Debug: Log the data being sent
@@ -821,8 +797,6 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
             setFormData({
                 category: '', subcategory: '', location: '', purchaseDate: '', invoiceNumber: '', purchaseCost: '',
                 gstRate: '', invoiceScan: null, warrantyExpiry: '',
-                team: '', laptopCompany: '', processor: '', ram: '', memory: '', 
-                condition: 'New', accessories: '', graphicsCard: '',
                 statusLabelId: ''
             });
             setGeneratedAssetId('');
@@ -1052,6 +1026,7 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
 
 
 
+
                 </div>
                 <div className="bg-gray-50 px-6 py-3 flex justify-end items-center rounded-b-lg">
                     <div className="flex items-center gap-2">
@@ -1275,4 +1250,4 @@ const AssetManagementPage = () => {
     );
 };
 
-export default withAuth(AssetManagementPage);
+export default withAuth(AssetManagementPage); 

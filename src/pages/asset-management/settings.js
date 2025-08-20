@@ -22,8 +22,6 @@ import {
     removeSubCategoryLocal
 } from '@/redux/slices/assetCategorySlice';
 
-import { checkAssetApiHealth } from '@/redux/slices/assetSlice';
-
 import { 
     fetchAssetLocations, 
     addAssetLocation, 
@@ -147,6 +145,7 @@ const CategorySettings = ({
     onSaveIdFormat, 
     onCancelIdFormat 
 }) => {
+    const isAddDisabled = !newCategory.name || loading;
     const [newSubCatFieldsByCategory, setNewSubCatFieldsByCategory] = useState({});
     
     console.log('CategorySettings rendered with categories:', editedCategories);
@@ -183,20 +182,16 @@ const CategorySettings = ({
             
             {/* Step 1: Add New Category */}
             <div className="flex items-end gap-4 mb-6 w-full max-w-3xl mx-auto">
-                <div className="flex-1 min-w-[220px]">
-                    <input 
-                        value={newCategory.name} 
-                        onChange={e => setNewCategory({...newCategory, name: e.target.value, showError: false})} 
-                        placeholder="New Category Name (e.g., IT Equipment)" 
-                        className="w-full p-3 border rounded-md text-base" 
-                    />
-                    {newCategory.showError && (
-                        <p className="text-red-600 text-sm mt-1">Enter Category name</p>
-                    )}
-                </div>
+                <input 
+                    value={newCategory.name} 
+                    onChange={e => setNewCategory({...newCategory, name: e.target.value})} 
+                    placeholder="New Category Name (e.g., IT Equipment)" 
+                    className="flex-1 min-w-[220px] p-3 border rounded-md text-base" 
+                />
                 <button 
                     onClick={onAdd} 
-                    className="px-7 py-3 bg-blue-600 text-white rounded-md whitespace-nowrap text-base font-semibold shadow-sm transition-all duration-150 hover:bg-blue-700"
+                    className={`px-7 py-3 bg-blue-600 text-white rounded-md whitespace-nowrap text-base font-semibold shadow-sm transition-all duration-150 ${isAddDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isAddDisabled}
                 >
                     <FaPlus className="inline mr-1" /> Add Category
                 </button>
@@ -207,8 +202,7 @@ const CategorySettings = ({
             {/* Step 2: Category Cards with Sub-Categories */}
             <div className="space-y-6">
                 {editedCategories.map(cat => {
-                    // Ensure we're using the custom categoryId, not MongoDB _id
-        const categoryId = cat.categoryId;
+                    const categoryId = cat.id || cat.categoryId;
                     const subCategories = cat.subCategories || [];
                     const categoryCode = getFirstThreeLetters(cat.name);
                     
@@ -288,7 +282,7 @@ const CategorySettings = ({
                     const setField = (key, val) => {
                         setNewSubCatFieldsByCategory(prev => ({
                             ...prev,
-                            [categoryId]: { ...(prev[categoryId] || {}), [key]: val, showError: false }
+                            [categoryId]: { ...(prev[categoryId] || {}), [key]: val }
                         }));
                     };
                     const sanitizePrefix = (val) => val; // allow arbitrary prefix
@@ -309,9 +303,6 @@ const CategorySettings = ({
                                         placeholder="e.g., Laptop, Monitor, Printer"
                                         className="w-full p-3 border border-gray-300 rounded-md text-base"
                                     />
-                                    {current.showError && !current.name?.trim() && (
-                                        <p className="text-red-600 text-sm mt-1">Enter Sub-Category name</p>
-                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Asset ID Prefix ({categoryCode}-{getFirstThreeLetters(current.name)})</label>
@@ -321,9 +312,6 @@ const CategorySettings = ({
                                         placeholder="CAT-SUB"
                                         className="w-full p-3 border border-gray-300 rounded-md text-base font-mono"
                                     />
-                                    {current.showError && !current.prefix?.trim() && (
-                                        <p className="text-red-600 text-sm mt-1">Enter Asset ID Prefix</p>
-                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Suffix (4 digits)</label>
@@ -333,9 +321,6 @@ const CategorySettings = ({
                                         placeholder="0001"
                                         className="w-full p-3 border border-gray-300 rounded-md text-base font-mono"
                                     />
-                                    {current.showError && !current.suffix && (
-                                        <p className="text-red-600 text-sm mt-1">Enter Suffix</p>
-                                    )}
                                 </div>
                             </div>
                             <div className="flex items-center justify-between">
@@ -353,25 +338,16 @@ const CategorySettings = ({
                                             prefix: (current.prefix || '').trim(),
                                             suffix: current.suffix
                                         };
-                                        if (!payload.name || !isValidPrefix() || !payload.suffix) {
-                                            // Show error for empty fields
-                                            setNewSubCatFieldsByCategory(prev => ({ 
-                                                ...prev, 
-                                                [categoryId]: { 
-                                                    ...current, 
-                                                    showError: true 
-                                                } 
-                                            }));
-                                            return;
-                                        }
+                                        if (!payload.name || !isValidPrefix() || !payload.suffix) return;
                                         try {
                                             await onAddSubCategory(categoryId, payload);
-                                            setNewSubCatFieldsByCategory(prev => ({ ...prev, [categoryId]: { name: '', prefix: '', suffix: '', showError: false } }));
+                                            setNewSubCatFieldsByCategory(prev => ({ ...prev, [categoryId]: { name: '', prefix: '', suffix: '' } }));
                                         } catch (e) {
                                             // Keep inputs for correction
                                         }
                                     }}
-                                    className="px-6 py-3 rounded-md flex items-center gap-2 font-medium bg-green-600 text-white hover:bg-green-700"
+                                    disabled={!isValid || loading}
+                                    className={`px-6 py-3 rounded-md flex items-center gap-2 font-medium ${(!isValid || loading) ? 'bg-gray-400 text-gray-700 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}`}
                                 >
                                     <FaPlus /> Create Sub-Category
                                 </button>
@@ -408,13 +384,13 @@ const CategorySettings = ({
                                                     {subCategories.map((subCat, index) => {
                                                     console.log(`Rendering subcategory:`, subCat);
                                                     return (
-                                                    <tr key={subCat.subCategoryId || subCat.id} className="border-t border-gray-200 hover:bg-gray-50">
+                                                    <tr key={subCat.id || subCat.subCategoryId} className="border-t border-gray-200 hover:bg-gray-50">
                                                         <td className="p-3">
                                                             {subCat.editing ? (
                                                                 <input
                                                                     className="w-full p-2 border rounded-md text-sm"
                                                                     value={subCat.name}
-                                                                    onChange={e => onEditSubCategory(categoryId, subCat.subCategoryId || subCat.id, 'name', e.target.value)}
+                                                                    onChange={e => onEditSubCategory(categoryId, subCat.id || subCat.subCategoryId, 'name', e.target.value)}
                                                                     placeholder="Sub-category name"
                                                                     autoFocus
                                                                 />
@@ -440,7 +416,7 @@ const CategorySettings = ({
                                                                                     onChange={(e) => {
                                                                                         onEditSubCategory(
                                                                                             categoryId,
-                                                                                            subCat.subCategoryId || subCat.id,
+                                                                                            subCat.id || subCat.subCategoryId,
                                                                                             'prefix',
                                                                                             e.target.value
                                                                                         );
@@ -463,7 +439,7 @@ const CategorySettings = ({
                                                                                         const digits = raw.replace(/\D/g, '').slice(0, 4);
                                                                                         onEditSubCategory(
                                                                                             categoryId,
-                                                                                            subCat.subCategoryId || subCat.id,
+                                                                                            subCat.id || subCat.subCategoryId,
                                                                                             'suffix',
                                                                                             digits
                                                                                         );
@@ -490,14 +466,14 @@ const CategorySettings = ({
                                                                 {subCat.editing ? (
                                                                     <>
                                                                         <button
-                                                                            onClick={() => onSaveSubCategory(categoryId, subCat.subCategoryId || subCat.id)}
+                                                                            onClick={() => onSaveSubCategory(categoryId, subCat.id || subCat.subCategoryId)}
                                                                             className="text-green-600 hover:text-green-800 p-1"
                                                                             title="Save"
                                                                         >
                                                                             <FaSave />
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => onCancelSubCategory(categoryId, subCat.subCategoryId || subCat.id)}
+                                                                            onClick={() => onCancelSubCategory(categoryId, subCat.id || subCat.subCategoryId)}
                                                                             className="text-gray-600 hover:text-gray-800 p-1"
                                                                             title="Cancel"
                                                                         >
@@ -507,14 +483,14 @@ const CategorySettings = ({
                                                                 ) : (
                                                                     <>
                                                                         <button
-                                                                            onClick={() => onEditSubCategory(categoryId, subCat.subCategoryId || subCat.id, 'editing', true)}
+                                                                            onClick={() => onEditSubCategory(categoryId, subCat.id || subCat.subCategoryId, 'editing', true)}
                                                                             className="text-blue-600 hover:text-blue-800 p-1"
                                                                             title="Edit"
                                                                         >
                                                                             <FaEdit />
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => onDeleteSubCategory(categoryId, subCat.subCategoryId || subCat.id)}
+                                                                            onClick={() => onDeleteSubCategory(categoryId, subCat.id || subCat.subCategoryId)}
                                                                             className="text-red-500 hover:text-red-700 p-1"
                                                                             title="Delete"
                                                                         >
@@ -570,20 +546,16 @@ const CategorySettings = ({
 };
 
 const LocationSettings = ({ editing, editedLocations, setEditedLocations, newLocation, setNewLocation, onAdd, onFieldChange, loading, onDelete, onSave, onCancel }) => {
+    const isAddDisabled = !newLocation.name || loading;
     return (
         <SettingsSection title="Asset Locations" subtitle="Manage the physical locations where assets are stored or assigned.">
             <div className="flex items-end gap-4 mb-4 w-full max-w-3xl mx-auto">
-                <div className="flex-1 min-w-[220px]">
-                    <input 
-                        value={newLocation.name} 
-                        onChange={e => setNewLocation({...newLocation, name: e.target.value, showError: false})} 
-                        placeholder="New Location Name (e.g., Mumbai Office)" 
-                        className="w-full p-3 border rounded-md text-base" 
-                    />
-                    {newLocation.showError && (
-                        <p className="text-red-600 text-sm mt-1">Enter Location name</p>
-                    )}
-                </div>
+                <input 
+                    value={newLocation.name} 
+                    onChange={e => setNewLocation({...newLocation, name: e.target.value})} 
+                    placeholder="New Location Name (e.g., Mumbai Office)" 
+                    className="flex-1 min-w-[220px] p-3 border rounded-md text-base" 
+                />
                 <input 
                     value={newLocation.address} 
                     onChange={e => setNewLocation({...newLocation, address: e.target.value})} 
@@ -592,7 +564,8 @@ const LocationSettings = ({ editing, editedLocations, setEditedLocations, newLoc
                 />
                 <button 
                     onClick={onAdd} 
-                    className="px-7 py-3 bg-blue-600 text-white rounded-md whitespace-nowrap text-base font-semibold shadow-sm transition-all duration-150 hover:bg-blue-700"
+                    className={`px-7 py-3 bg-blue-600 text-white rounded-md whitespace-nowrap text-base font-semibold shadow-sm transition-all duration-150 ${isAddDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isAddDisabled}
                 >
                     <FaPlus className="inline mr-1" /> Add
                 </button>
@@ -600,21 +573,21 @@ const LocationSettings = ({ editing, editedLocations, setEditedLocations, newLoc
             {loading && <div className="text-blue-600">Loading...</div>}
             <div className="space-y-2">
                 {editedLocations.map(loc => (
-                                                    <div key={loc.locationId || loc.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <div key={loc.id || loc.locationId} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                         <div className="flex-1 flex gap-2 items-center">
                             {loc.editing ? (
                                 <>
                                     <input
                                         className="flex-1 p-2 border rounded-md"
                                         value={loc.name}
-                                        onChange={e => onFieldChange(loc.locationId || loc.id, 'name', e.target.value)}
+                                        onChange={e => onFieldChange(loc.id || loc.locationId, 'name', e.target.value)}
                                         placeholder="Location name"
                                         autoFocus
                                     />
                                     <input
                                         className="flex-1 p-2 border rounded-md"
                                         value={loc.address}
-                                        onChange={e => onFieldChange(loc.locationId || loc.id, 'address', e.target.value)}
+                                        onChange={e => onFieldChange(loc.id || loc.locationId, 'address', e.target.value)}
                                         placeholder="Address (optional)"
                                     />
                                 </>
@@ -626,14 +599,14 @@ const LocationSettings = ({ editing, editedLocations, setEditedLocations, newLoc
                             {loc.editing ? (
                                 <>
                                     <button
-                                        onClick={() => onSave(loc.locationId || loc.id)}
+                                        onClick={() => onSave(loc.id || loc.locationId)}
                                         className="text-green-600 hover:text-green-800 p-2 hover:bg-green-50 rounded"
                                         title="Save Changes"
                                     >
                                         <FaSave />
                                     </button>
                                     <button
-                                        onClick={() => onCancel(loc.locationId || loc.id)}
+                                        onClick={() => onCancel(loc.id || loc.locationId)}
                                         className="text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-50 rounded"
                                         title="Cancel"
                                     >
@@ -643,7 +616,7 @@ const LocationSettings = ({ editing, editedLocations, setEditedLocations, newLoc
                             ) : (
                                 <>
                                 <button
-                                        onClick={() => onFieldChange(loc.locationId || loc.id, 'editing', true)}
+                                        onClick={() => onFieldChange(loc.id || loc.locationId, 'editing', true)}
                                         className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded"
                                     title="Edit Location"
                                 >
@@ -667,23 +640,20 @@ const LocationSettings = ({ editing, editedLocations, setEditedLocations, newLoc
 };
 
 const StatusSettings = ({ editing, editedStatuses, setEditedStatuses, newStatus, setNewStatus, onAdd, onFieldChange, loading, onDelete, onSave, onCancel }) => {
+    const isAddDisabled = !newStatus.name || loading;
     return (
         <SettingsSection title="Asset Status Labels" subtitle="Customize the lifecycle statuses for your assets.">
             <div className="flex items-end gap-4 mb-4 w-full max-w-2xl mx-auto">
-                <div className="flex-1 min-w-[220px]">
-                    <input 
-                        value={newStatus.name} 
-                        onChange={e => setNewStatus({ name: e.target.value, showError: false })} 
-                        placeholder="New Status Name (e.g., In Transit)" 
-                        className="w-full p-3 border rounded-md text-base" 
-                    />
-                    {newStatus.showError && (
-                        <p className="text-red-600 text-sm mt-1">Enter Status name</p>
-                    )}
-                </div>
+                <input 
+                    value={newStatus.name} 
+                    onChange={e => setNewStatus({ name: e.target.value })} 
+                    placeholder="New Status Name (e.g., In Transit)" 
+                    className="flex-1 min-w-[220px] p-3 border rounded-md text-base" 
+                />
                 <button 
                     onClick={onAdd} 
-                    className="px-7 py-3 bg-blue-600 text-white rounded-md whitespace-nowrap text-base font-semibold shadow-sm transition-all duration-150 hover:bg-blue-700"
+                    className={`px-7 py-3 bg-blue-600 text-white rounded-md whitespace-nowrap text-base font-semibold shadow-sm transition-all duration-150 ${isAddDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isAddDisabled}
                 >
                     <FaPlus className="inline mr-1" /> Add
                 </button>
@@ -917,16 +887,6 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
         setError('');
         dispatch(clearCurrentForm());
     };
-    
-    const handleFormNameChange = (value) => {
-        setFormName(value);
-        if (error) setError('');
-    };
-    
-    const handleCategoryChange = (value) => {
-        setSelectedCategory(value);
-        if (error) setError('');
-    };
 
     // Helper function to map API fields to frontend format
     const mapApiFieldsToFrontend = (apiFields) => {
@@ -973,7 +933,6 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
             // Use assignedCategoryId if categoryId is null/empty
             const categoryToUse = form.categoryId || form.assignedCategoryId || '';
             setSelectedCategory(categoryToUse);
-            setError(''); // Clear any previous errors
             
             // Map API fields to frontend format and ensure proper state update
             const mappedFields = mapApiFieldsToFrontend(form.fields || []);
@@ -1021,63 +980,17 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
 
     const handleToggleFormStatus = async (formId) => {
         try {
-            // Validate formId
-            if (!formId || formId === 'undefined' || formId === undefined) {
-                console.error('Invalid form ID:', formId);
-                toast.error('Invalid form ID. Please refresh the page and try again.');
-                return;
+            const form = forms.find(f => f.id === formId);
+            if (form) {
+                await dispatch(toggleFormStatus({ 
+                    formId, 
+                    enabled: !form.enabled 
+                })).unwrap();
+                toast.success("Form status updated successfully!");
             }
-            
-            const form = forms.find(f => f.id === formId || f.formId === formId);
-            if (!form) {
-                console.error('Form not found for ID:', formId);
-                toast.error('Form not found. Please refresh the page and try again.');
-                return;
-            }
-            
-            // Use the correct form ID (prioritize formId over id)
-            const actualFormId = form.formId || form.id;
-            
-            console.log('Toggling form status for:', { 
-                formId, 
-                actualFormId,
-                currentEnabled: form.enabled, 
-                newEnabled: !form.enabled,
-                form: form
-            });
-            
-            await dispatch(toggleFormStatus({ 
-                formId: actualFormId, 
-                enabled: !form.enabled 
-            })).unwrap();
-            
-            toast.success("Form status updated successfully!");
-            
-            // Refresh forms to get updated data
-            dispatch(fetchCustomForms());
         } catch (error) {
             console.error('Error toggling form status:', error);
-            
-            // Provide more specific error messages
-            let errorMessage = "Failed to update form status";
-            if (error?.payload) {
-                errorMessage = error.payload;
-            } else if (error?.message) {
-                errorMessage = error.message;
-            } else if (error?.data?.message) {
-                errorMessage = error.data.message;
-            }
-            
-            toast.error(errorMessage);
-            
-            // Log detailed error information
-            console.error('Toggle form status error details:', {
-                formId,
-                error: error,
-                payload: error?.payload,
-                message: error?.message,
-                data: error?.data
-            });
+            toast.error("Failed to update form status");
         }
     };
 
@@ -1126,9 +1039,6 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
         );
         console.log('Updated fields after field update:', updatedFields);
         setFields(updatedFields);
-        
-        // Clear error when user starts typing
-        if (error) setError('');
     };
 
     const addDropdownOption = (fieldId) => {
@@ -1167,59 +1077,83 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
     };
 
     const handleSaveForm = async () => {
-        let hasErrors = false;
-        
-        // Validate form name
         if (!formName || !formName.trim()) {
             setError('Form name is required');
-            hasErrors = true;
+            return;
         }
 
-        // Validate category selection
         if (!selectedCategory) {
             setError('Please select a category');
-            hasErrors = true;
+            return;
+        }
+
+        // Additional validation for category
+        if (!selectedCategory || selectedCategory.trim() === '') {
+            setError('Category is required and cannot be empty');
+            return;
+        }
+
+        // Log the selected category for debugging
+        console.log('Selected category validation:', {
+            selectedCategory,
+            trimmed: selectedCategory?.trim(),
+            isEmpty: !selectedCategory || selectedCategory.trim() === '',
+            type: typeof selectedCategory
+        });
+
+        if (fields.length === 0) {
+            setError('At least one field is required');
+            return;
         }
 
         // Validate fields
-        if (fields.length === 0) {
-            setError('At least one field is required');
-            hasErrors = true;
-        }
-
-        // Validate individual fields
         for (let field of fields) {
             if (!field.name || !field.name.trim()) {
                 setError('All fields must have a name');
-                hasErrors = true;
-                break;
+                return;
             }
             if (field.type === 'dropdown' && field.options.length === 0) {
                 setError('Dropdown fields must have at least one option');
-                hasErrors = true;
-                break;
+                return;
+            }
+            
+            // Additional validation for dropdown options
+            if (field.type === 'dropdown' && field.options.length > 0) {
+                const invalidOptions = field.options.filter(opt => !opt.value || !opt.value.trim());
+                if (invalidOptions.length > 0) {
+                    setError(`Dropdown field "${field.name}" has empty options`);
+                    return;
+                }
+                
+                // Check for duplicate option values
+                const optionValues = field.options.map(opt => opt.value.trim());
+                const uniqueOptionValues = new Set(optionValues);
+                if (optionValues.length !== uniqueOptionValues.size) {
+                    setError(`Dropdown field "${field.name}" has duplicate option values`);
+                    return;
+                }
             }
         }
-        
-        if (hasErrors) {
+
+        // Additional validation for field names
+        const fieldNames = fields.map(f => f.name.trim()).filter(Boolean);
+        const uniqueFieldNames = new Set(fieldNames);
+        if (fieldNames.length !== uniqueFieldNames.size) {
+            setError('Field names must be unique');
+            return;
+        }
+
+        // Check for empty or invalid field names
+        const invalidFields = fields.filter(f => !f.name || !f.name.trim() || f.name.trim().length === 0);
+        if (invalidFields.length > 0) {
+            setError(`Invalid field names found: ${invalidFields.map(f => f.name || 'unnamed').join(', ')}`);
             return;
         }
 
         setLoading(true);
         setError('');
-        
-        // Clear any previous errors
-        setError('');
 
         try {
-            // Debug the subcategory selection
-            console.log('selectedSubCategory value:', selectedSubCategory);
-            console.log('selectedSubCategory type:', typeof selectedSubCategory);
-            console.log('selectedSubCategory truthy check:', !!selectedSubCategory);
-            console.log('selectedSubCategory length:', selectedSubCategory ? selectedSubCategory.length : 'N/A');
-            console.log('subCategoriesForSelectedCategory:', subCategoriesForSelectedCategory);
-            console.log('Available subcategories for selected category:', subCategoriesForSelectedCategory.map(sub => ({ id: sub.subCategoryId || sub.id, name: sub.name })));
-            
             const formData = {
                 name: formName.trim(),
                 categoryId: selectedCategory,
@@ -1236,85 +1170,35 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                 ...(selectedSubCategory ? { subCategoryId: selectedSubCategory } : {})
             };
             
-            console.log('Final formData object:', formData);
-            console.log('formData.subCategoryId:', formData.subCategoryId);
-            console.log('formData structure:', {
-                hasName: !!formData.name,
-                hasCategoryId: !!formData.categoryId,
-                hasSubCategoryId: !!formData.subCategoryId,
-                subCategoryIdValue: formData.subCategoryId,
-                subCategoryIdType: typeof formData.subCategoryId,
-                fieldsCount: formData.fields?.length || 0
-            });
+            // Debug logging to understand what's being sent
+            console.log('Form data being sent to API:', JSON.stringify(formData, null, 2));
+            console.log('Fields structure:', JSON.stringify(fields, null, 2));
+            console.log('Selected category:', selectedCategory);
+            console.log('Selected sub-category:', selectedSubCategory);
             
             let savedFormId = editingFormId;
             if (editingFormId) {
+                console.log('Updating existing form with ID:', editingFormId);
                 const updated = await dispatch(updateCustomForm({ 
                     formId: editingFormId, 
                     formData 
                 })).unwrap();
-                // For updates, always use the existing formId (editingFormId)
-                savedFormId = editingFormId; // Never fall back to MongoDB _id for updates
-                console.log('Form updated, savedFormId:', savedFormId, 'updated object:', updated);
-                console.log('Updated form ID analysis:', {
-                    formId: updated?.formId,
-                    id: updated?.id,
-                    editingFormId,
-                    finalSavedFormId: savedFormId,
-                    isFormId: savedFormId?.startsWith?.('FORM-'),
-                    isMongoId: /^\d+$/.test(savedFormId)
-                });
+                savedFormId = updated?.id || editingFormId;
                 toast.success("Form updated successfully!");
             } else {
+                console.log('Creating new form');
                 const created = await dispatch(createCustomForm(formData)).unwrap();
-                // For new forms, try to get formId, but if not available, generate one
-                if (created?.formId) {
-                    savedFormId = created.formId;
-                } else if (created?.id && created.id.toString().startsWith('FORM-')) {
-                    savedFormId = created.id;
-                } else {
-                    // Generate a fallback formId if backend doesn't provide one
-                    savedFormId = `FORM-${Date.now()}`;
-                    console.warn('Backend did not return formId, generated fallback:', savedFormId);
-                }
-                console.log('Form created, savedFormId:', savedFormId, 'created object:', created);
-                console.log('Created form ID analysis:', {
-                    formId: created?.formId,
-                    id: created?.id,
-                    finalSavedFormId: savedFormId,
-                    isFormId: savedFormId?.startsWith?.('FORM-'),
-                    isMongoId: /^\d+$/.test(savedFormId)
-                });
+                savedFormId = created?.id || created?.formId;
                 toast.success("Form created successfully!");
             }
 
             // Assign to sub-category via dedicated endpoint if provided
             if (savedFormId && selectedSubCategory) {
-                console.log('Assigning subcategory to form:', {
-                    savedFormId,
-                    selectedSubCategory,
-                    savedFormIdType: typeof savedFormId,
-                    isFormId: savedFormId?.startsWith?.('FORM-'),
-                    isMongoId: /^\d+$/.test(savedFormId)
-                });
-                
-                // Validate that we have a proper formId, not a MongoDB _id
-                if (!savedFormId.toString().startsWith('FORM-')) {
-                    console.error('Invalid formId for subcategory assignment:', savedFormId);
-                    toast.error("Cannot assign subcategory: Invalid form ID format");
-                    return;
-                }
-                
                 try {
                     await dispatch(assignFormToSubCategory({ formId: savedFormId, subCategoryId: selectedSubCategory })).unwrap();
                     toast.success("Sub-category assigned to form");
                 } catch (e) {
                     console.error('Failed to assign sub-category:', e);
-                    console.error('Error details:', {
-                        error: e,
-                        response: e.response?.data,
-                        status: e.response?.status
-                    });
                     toast.error("Failed to assign sub-category");
                 }
             }
@@ -1324,8 +1208,30 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
             
         } catch (error) {
             console.error('Error saving form:', error);
-            setError('Failed to save form. Please try again.');
-            toast.error("Failed to save form");
+            
+            // Extract more specific error information
+            let errorMessage = 'Failed to save form. Please try again.';
+            
+            if (error?.message) {
+                errorMessage = error.message;
+            } else if (error?.error) {
+                errorMessage = error.error;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            
+            // Log detailed error information
+            console.error('Detailed error info:', {
+                error,
+                message: error?.message,
+                errorData: error?.error,
+                response: error?.response,
+                status: error?.response?.status,
+                data: error?.response?.data
+            });
+            
+            setError(errorMessage);
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -1518,15 +1424,16 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                     <tr>
                                         <th className="text-left p-4 font-semibold text-gray-700">Form Name</th>
                                         <th className="text-left p-4 font-semibold text-gray-700">Assigned Category</th>
+                                        <th className="text-left p-4 font-semibold text-gray-700">Status</th>
                                         <th className="text-left p-4 font-semibold text-gray-700">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {forms.map((form) => (
                                         <tr 
-                                            key={form.formId || form.id} 
+                                            key={form.id || form.formId} 
                                             className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                                            onClick={() => handleEditForm(form.formId || form.id)}
+                                            onClick={() => handleEditForm(form.id || form.formId)}
                                         >
                                             <td className="p-4 font-medium">{form.name}</td>
                                             <td className="p-4 text-gray-600">
@@ -1538,24 +1445,45 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                                     return matchingCategory?.name || formCategoryId || 'No Category';
                                                 })()}
                                             </td>
-
+                                            <td className="p-4">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                    form.enabled
+                                                        ? 'bg-green-100 text-green-700' 
+                                                        : 'bg-gray-100 text-gray-600'
+                                                }`}>
+                                                    {form.enabled ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </td>
                                             <td className="p-4">
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleEditForm(form.formId || form.id);
+                                                            handleEditForm(form.id || form.formId);
                                                         }}
                                                         className="text-blue-600 hover:text-blue-800"
                                                         title="Edit Form"
                                                     >
                                                         <FaEdit />
                                                     </button>
-
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            onDeleteForm(form.formId || form.id);
+                                                            handleToggleFormStatus(form.id || form.formId);
+                                                        }}
+                                                        className={`text-sm px-2 py-1 rounded ${
+                                                            form.enabled
+                                                                ? 'text-orange-600 hover:text-orange-800'
+                                                                : 'text-green-600 hover:text-green-800'
+                                                        }`}
+                                                        title={form.enabled ? 'Deactivate' : 'Activate'}
+                                                    >
+                                                        {form.enabled ? 'Deactivate' : 'Activate'}
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onDeleteForm(form.id || form.formId);
                                                         }}
                                                         className="text-red-600 hover:text-red-800"
                                                         title="Delete Form"
@@ -1631,14 +1559,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                         </label>
                                         <select
                                             value={selectedSubCategory}
-                                            onChange={(e) => {
-                                                console.log('Subcategory selection changed:', {
-                                                    oldValue: selectedSubCategory,
-                                                    newValue: e.target.value,
-                                                    event: e.target.value
-                                                });
-                                                setSelectedSubCategory(e.target.value);
-                                            }}
+                                            onChange={(e) => setSelectedSubCategory(e.target.value)}
                                             className="w-full p-3 border border-gray-300 rounded-md"
                                             disabled={!selectedCategory || categoriesLoading}
                                         >
@@ -1754,13 +1675,14 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
 
                             {/* Save Button */}
                             <div className="pt-4">
-                                                            <button
-                                onClick={handleSaveForm}
-                                className="w-full px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium"
-                            >
-                                {loading ? 'Saving...' : '💾 Save Form'}
-                            </button>
-                            {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+                                <button
+                                    onClick={handleSaveForm}
+                                    disabled={loading || !formName.trim() || !selectedCategory || fields.length === 0}
+                                    className="w-full px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                                >
+                                    {loading ? 'Saving...' : '💾 Save Form'}
+                                </button>
+                                {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
                             </div>
                         </div>
 
@@ -1969,7 +1891,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
 };
 
 // Delete confirmation modals
-const DeleteCategoryModal = ({ open, onClose, onConfirm, categoryName, warning, assetsCount, assetsList, hasSubCategories, subCategoriesCount, subCategoriesList, backendError }) => {
+const DeleteCategoryModal = ({ open, onClose, onConfirm, categoryName, warning, assetsCount, assetsList }) => {
     if (!open) return null;
     
     return (
@@ -1985,72 +1907,32 @@ const DeleteCategoryModal = ({ open, onClose, onConfirm, categoryName, warning, 
                             <p className="text-yellow-800 font-medium mb-2">
                                 ⚠️ Cannot Delete Category
                             </p>
-                            
-                            {hasSubCategories ? (
-                                <div>
-                                    <p className="text-yellow-700 text-sm">
-                                        The category <span className="font-semibold">&quot;{categoryName}&quot;</span> has <span className="font-semibold">{subCategoriesCount} sub-category(ies)</span>.
-                                    </p>
-                                    
-                                    {subCategoriesList && subCategoriesList.length > 0 && (
-                                        <div className="mt-3">
-                                            <p className="text-sm font-medium text-gray-700 mb-2">Sub-categories in this category:</p>
-                                            <div className="max-h-32 overflow-y-auto bg-gray-50 rounded p-2">
-                                                {subCategoriesList.map((sub, index) => (
-                                                    <div key={sub.subCategoryId || sub.id} className="text-sm text-gray-600 py-1">
-                                                        • {sub.name} ({sub.subCategoryId})
-                                                    </div>
-                                                ))}
-                                                {subCategoriesCount > 5 && (
-                                                    <div className="text-sm text-gray-500 italic">
-                                                        ... and {subCategoriesCount - 5} more
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                    
-                                    <p className="text-sm text-gray-600 mt-3">
-                                        Please delete all sub-categories first before deleting this category.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div>
-                                    <p className="text-yellow-700 text-sm">
-                                        The category <span className="font-semibold">&quot;{categoryName}&quot;</span> is currently being used by <span className="font-semibold">{assetsCount} asset(s)</span>.
-                                    </p>
-                                    
-                                    {assetsList && assetsList.length > 0 && (
-                                        <div className="mt-3">
-                                            <p className="text-sm font-medium text-gray-700 mb-2">Assets using this category:</p>
-                                            <div className="max-h-32 overflow-y-auto bg-gray-50 rounded p-2">
-                                                {assetsList.map((asset, index) => (
-                                                    <div key={asset.assetId || asset.id} className="text-sm text-gray-600 py-1">
-                                                        • {asset.name || asset.assetId} ({asset.assetId})
-                                                    </div>
-                                                ))}
-                                                {assetsCount > 5 && (
-                                                    <div className="text-sm text-gray-500 italic">
-                                                        ... and {assetsCount - 5} more
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                    
-                                    <p className="text-sm text-gray-600 mt-3">
-                                        Please change the category of these assets to a different category before deleting this one.
-                                    </p>
-                                </div>
-                            )}
+                            <p className="text-yellow-700 text-sm">
+                                The category <span className="font-semibold">&quot;{categoryName}&quot;</span> is currently being used by <span className="font-semibold">{assetsCount} asset(s)</span>.
+                            </p>
                         </div>
                         
-                        {backendError && (
-                            <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
-                                <p className="text-sm font-medium text-gray-700 mb-2">Backend Error Message:</p>
-                                <p className="text-sm text-gray-600 italic">{backendError}</p>
+                        {assetsList && assetsList.length > 0 && (
+                            <div className="mb-4">
+                                <p className="text-sm font-medium text-gray-700 mb-2">Assets using this category:</p>
+                                <div className="max-h-32 overflow-y-auto bg-gray-50 rounded p-2">
+                                    {assetsList.map((asset, index) => (
+                                        <div key={asset.id || asset.assetId} className="text-sm text-gray-600 py-1">
+                                            • {asset.name || asset.assetId} ({asset.assetId})
+                                        </div>
+                                    ))}
+                                    {assetsCount > 5 && (
+                                        <div className="text-sm text-gray-500 italic">
+                                            ... and {assetsCount - 5} more
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
+                        
+                        <p className="text-sm text-gray-600 mb-4">
+                            Please change the category of these assets to a different category before deleting this one.
+                        </p>
                     </div>
                 ) : (
                     <p className="mb-4 text-gray-700">
@@ -2071,8 +1953,8 @@ const DeleteCategoryModal = ({ open, onClose, onConfirm, categoryName, warning, 
                 </div>
             </div>
         </div>
-        );
-    };
+    );
+};
 
 const DeleteLocationModal = ({ open, onClose, onConfirm, locationName, warning, assetsCount, assetsList }) => {
     if (!open) return null;
@@ -2100,7 +1982,7 @@ const DeleteLocationModal = ({ open, onClose, onConfirm, locationName, warning, 
                                 <p className="text-sm font-medium text-gray-700 mb-2">Assets using this location:</p>
                                 <div className="max-h-32 overflow-y-auto bg-gray-50 rounded p-2">
                                     {assetsList.map((asset, index) => (
-                                        <div key={asset.assetId || asset.id} className="text-sm text-gray-600 py-1">
+                                        <div key={asset.id || asset.assetId} className="text-sm text-gray-600 py-1">
                                             • {asset.name || asset.assetId} ({asset.assetId})
                                         </div>
                                     ))}
@@ -2165,7 +2047,7 @@ const DeleteStatusModal = ({ open, onClose, onConfirm, statusName, warning, asse
                                 <p className="text-sm font-medium text-gray-700 mb-2">Assets using this status:</p>
                                 <div className="max-h-32 overflow-y-auto bg-gray-50 rounded p-2">
                                     {assetsList.map((asset, index) => (
-                                        <div key={asset.assetId || asset.id} className="text-sm text-gray-600 py-1">
+                                        <div key={asset.id || asset.assetId} className="text-sm text-gray-600 py-1">
                                             • {asset.name || asset.assetId} ({asset.assetId})
                                         </div>
                                     ))}
@@ -2239,60 +2121,6 @@ const DeleteFormModal = ({ open, onClose, onConfirm, formName }) => {
     );
 };
 
-const DeleteSubCategoryModal = ({ open, onClose, onConfirm, subCategoryName, warning, assetsCount, errorMessage }) => {
-    if (!open) return null;
-    
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
-                <h2 className="text-xl font-bold text-red-600 mb-2 flex items-center gap-2">
-                    <FaTrash /> Delete Sub-Category
-                </h2>
-                
-                {warning ? (
-                    <div>
-                        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                            <p className="text-yellow-800 font-medium mb-2">
-                                ⚠️ Cannot Delete Sub-Category
-                            </p>
-                            <p className="text-yellow-700 text-sm">
-                                The sub-category <span className="font-semibold">&quot;{subCategoryName}&quot;</span> is currently being used by <span className="font-semibold">{assetsCount} asset(s)</span>.
-                            </p>
-                        </div>
-                        
-                        <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
-                            <p className="text-sm font-medium text-gray-700 mb-2">Backend Error Message:</p>
-                            <p className="text-sm text-gray-600 italic">{errorMessage}</p>
-                        </div>
-                        
-                        <p className="text-sm text-gray-600 mb-4">
-                            Please change the sub-category of these assets to a different sub-category before deleting this one.
-                        </p>
-                    </div>
-                ) : (
-                    <div>
-                        <p className="mb-4 text-gray-700">
-                            Are you sure you want to delete the sub-category <span className="font-semibold">&quot;{subCategoryName}&quot;</span>?<br/>
-                            This action <span className="text-red-600 font-semibold">cannot be undone</span> and may affect assets linked to this sub-category.
-                        </p>
-                    </div>
-                )}
-                
-                <div className="flex justify-end gap-3 mt-6">
-                    <button onClick={onClose} className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300">
-                        {warning ? 'Close' : 'Cancel'}
-                    </button>
-                    {!warning && (
-                        <button onClick={onConfirm} className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700 font-semibold">
-                            Delete
-                        </button>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
 // --- Main Page Component ---
 const AssetSettingsPage = () => {
     const dispatch = useDispatch();
@@ -2347,10 +2175,7 @@ const AssetSettingsPage = () => {
     
     // Fetch assets when component mounts for status deletion validation
     useEffect(() => {
-        dispatch(fetchAllAssets()).catch(error => {
-            console.error('Failed to fetch assets for validation:', error);
-            // Don't show error toast here as it's just for validation
-        });
+        dispatch(fetchAllAssets());
     }, [dispatch]);
     
     // Separate editing states for each section
@@ -2362,10 +2187,10 @@ const AssetSettingsPage = () => {
     
     // State for editing
     const [editedCategories, setEditedCategories] = useState([]);
-    const [newCategory, setNewCategory] = useState({ name: '', showError: false });
+    const [newCategory, setNewCategory] = useState({ name: '' });
 
     const [editedLocations, setEditedLocations] = useState([]);
-    const [newLocation, setNewLocation] = useState({ name: '', address: '', showError: false });
+    const [newLocation, setNewLocation] = useState({ name: '', address: '' });
     const [deleteLocationModal, setDeleteLocationModal] = useState({ 
         open: false, 
         locationId: null, 
@@ -2376,7 +2201,7 @@ const AssetSettingsPage = () => {
     });
 
     const [editedStatuses, setEditedStatuses] = useState([]);
-    const [newStatus, setNewStatus] = useState({ name: '', showError: false });
+    const [newStatus, setNewStatus] = useState({ name: '' });
     const [deleteStatusModal, setDeleteStatusModal] = useState({ 
         open: false, 
         statusId: null, 
@@ -2392,16 +2217,6 @@ const AssetSettingsPage = () => {
         formName: ''
     });
 
-    const [deleteSubCategoryModal, setDeleteSubCategoryModal] = useState({ 
-        open: false, 
-        categoryId: null, 
-        subCategoryId: null,
-        subCategoryName: '',
-        warning: false,
-        assetsCount: 0,
-        errorMessage: ''
-    });
-
     const [deleteModal, setDeleteModal] = useState({ 
         open: false, 
         categoryId: null, 
@@ -2411,47 +2226,31 @@ const AssetSettingsPage = () => {
         assetsList: []
     });
 
-    // Network status state
-    const [networkStatus, setNetworkStatus] = useState({ 
-        isOnline: true, 
-        lastChecked: null, 
-        apiHealth: null 
-    });
-
     // Initialize data
     useEffect(() => {
         console.log('Loading asset management data...');
         
-        // Check network and API health
-        const checkNetworkStatus = async () => {
-            try {
-                // Check if browser is online
-                const isOnline = navigator.onLine;
-                setNetworkStatus(prev => ({ ...prev, isOnline }));
-                
-                if (isOnline) {
-                    // Check API health
-                    const apiHealth = await checkAssetApiHealth();
-                    setNetworkStatus(prev => ({ 
-                        ...prev, 
-                        apiHealth,
-                        lastChecked: new Date()
-                    }));
-                    
-                    if (!apiHealth.isHealthy) {
-                        console.warn('API health check failed:', apiHealth.error);
-                        toast.warning('API server appears to be offline. Some features may not work properly.');
-                    }
-                } else {
-                    console.warn('Browser is offline');
-                    toast.warning('You appear to be offline. Please check your internet connection.');
-                }
-            } catch (error) {
-                console.error('Error checking network status:', error);
-            }
-        };
-        
-        checkNetworkStatus();
+        // Debug function to test API response - commented out to avoid network errors
+        // const debugApiResponse = async () => {
+        //     try {
+        //         const token = getItemFromSessionStorage('token', null);
+        //         const response = await axios.get(`${publicRuntimeConfig.apiURL}/api/asset-settings/categories`, {
+        //             headers: { Authorization: `Bearer ${token}` }
+        //         });
+        //         console.log('Raw API response:', response.data);
+        //         
+        //         // Test subcategory creation
+        //         if (response.data?.data?.length > 0) {
+        //             const firstCategory = response.data.data[0];
+        //             console.log('First category:', firstCategory);
+        //             console.log('Subcategories in first category:', firstCategory.subCategories);
+        //         }
+        //     } catch (error) {
+        //         console.error('Debug API call failed:', error);
+        //     }
+        // };
+        // 
+        // debugApiResponse();
         
         dispatch(fetchAssetCategories());
         dispatch(fetchAssetLocations());
@@ -2503,14 +2302,14 @@ const AssetSettingsPage = () => {
     const handleAddCategory = async () => {
         console.log('handleAddCategory called with name:', newCategory.name);
         
-        if (!newCategory.name || !newCategory.name.trim()) { 
-            setNewCategory(prev => ({ ...prev, showError: true }));
+        if (!newCategory.name) { 
+            toast.error("Category name is required."); 
             return; 
         }
         
         try {
-            await dispatch(addAssetCategory({ name: newCategory.name.trim() })).unwrap();
-            setNewCategory({ name: '', showError: false });
+            await dispatch(addAssetCategory({ name: newCategory.name })).unwrap();
+            setNewCategory({ name: '' });
             toast.success("Category added successfully!");
         } catch (error) {
             toast.error("Failed to add category");
@@ -2530,7 +2329,7 @@ const AssetSettingsPage = () => {
         
         // Also update local state for immediate UI feedback
         setEditedCategories(editedCategories.map(cat => {
-            if (cat.categoryId === catId) {
+            if (cat.id === catId || cat.categoryId === catId) {
                 console.log('Updating category in local state:', { catId, key, value });
                 return { ...cat, [key]: value };
             }
@@ -2543,29 +2342,20 @@ const AssetSettingsPage = () => {
         
         if (categoryId) {
             // Save individual category
-            // Ensure we're using the custom categoryId, not MongoDB _id
-            const category = editedCategories.find(cat => cat.categoryId === categoryId);
+            const category = editedCategories.find(cat => cat.id === categoryId || cat.categoryId === categoryId);
             console.log('Found category to save:', category);
             
             if (category) {
                 try {
-                    // Ensure we have a valid custom categoryId, never use MongoDB _id
-                    if (!category.categoryId || category.categoryId === 'undefined' || category.categoryId === undefined) {
-                        console.error('Invalid category ID:', category.categoryId);
-                        toast.error('Cannot update: Invalid category ID');
-                        return;
-                    }
-                    
                     await dispatch(updateAssetCategory({
-                        categoryId: category.categoryId,
+                        categoryId: category.categoryId || category.id,
                         assetData: { name: category.name }
                     })).unwrap();
                     
                     // Clear editing state
-                    handleCategoryFieldChange(category.categoryId, 'editing', false);
+                    handleCategoryFieldChange(categoryId, 'editing', false);
                     toast.success("Category updated successfully!");
                 } catch (error) {
-                    console.error('Failed to update category:', error);
                     toast.error("Failed to update category");
                 }
             }
@@ -2577,13 +2367,12 @@ const AssetSettingsPage = () => {
         
         if (categoryId) {
             // Cancel individual category editing
-            // Ensure we're using the custom categoryId, not MongoDB _id
-            const originalCategory = categories.find(cat => cat.categoryId === categoryId);
+            const originalCategory = categories.find(cat => cat.id === categoryId || cat.categoryId === categoryId);
             console.log('Found original category for cancel:', originalCategory);
             
             if (originalCategory) {
                 setEditedCategories(editedCategories.map(cat => 
-                    cat.categoryId === categoryId
+                    (cat.id === categoryId || cat.categoryId === categoryId) 
                         ? { ...originalCategory, editing: false }
                         : cat
                 ));
@@ -2596,25 +2385,15 @@ const AssetSettingsPage = () => {
         console.log('handleDeleteCategory called with:', { categoryId, name });
         
         // Check if category has sub-categories
-        // Ensure we're using the custom categoryId, not MongoDB _id
-        const category = editedCategories.find(cat => cat.categoryId === categoryId);
+        const category = editedCategories.find(cat => cat.id === categoryId || cat.categoryId === categoryId);
         console.log('Found category for deletion:', category);
         
         const hasSubCategories = category && category.subCategories && category.subCategories.length > 0;
         
         if (hasSubCategories) {
-            // Show warning modal instead of toast for sub-categories
-            setDeleteModal({ 
-                open: true, 
-                categoryId, 
-                name,
-                warning: true,
-                assetsCount: 0,
-                assetsList: [],
-                hasSubCategories: true,
-                subCategoriesCount: category.subCategories.length,
-                subCategoriesList: category.subCategories.slice(0, 5)
-            });
+            const subCatList = category.subCategories.slice(0, 3).map(sub => sub.name).join(', ');
+            const moreText = category.subCategories.length > 3 ? ` and ${category.subCategories.length - 3} more` : '';
+            toast.error(`Cannot delete category "${name}" because it has ${category.subCategories.length} sub-category(ies): ${subCatList}${moreText}. Please delete all sub-categories first.`);
             return;
         }
         
@@ -2631,18 +2410,11 @@ const AssetSettingsPage = () => {
                 name,
                 warning: true,
                 assetsCount: assetsUsingCategory.length,
-                assetsList: assetsUsingCategory.slice(0, 5), // Show first 5 assets
-                hasSubCategories: false
+                assetsList: assetsUsingCategory.slice(0, 5) // Show first 5 assets
             });
         } else {
             // No assets using this category, proceed with deletion
-            setDeleteModal({ 
-                open: true, 
-                categoryId, 
-                name, 
-                warning: false,
-                hasSubCategories: false
-            });
+            setDeleteModal({ open: true, categoryId, name, warning: false });
         }
     };
     
@@ -2652,48 +2424,13 @@ const AssetSettingsPage = () => {
         try {
             await dispatch(deleteAssetCategory(deleteModal.categoryId)).unwrap();
             toast.success("Category deleted successfully!");
-            
-            // Refresh categories to update the UI
-            dispatch(fetchAssetCategories());
-            
         } catch (error) {
-            console.error('Error deleting category:', error);
-            
-            // Check if the error is about assets or sub-categories using this category
-            const errorMessage = error?.message || error?.data?.message || error?.error || error?.payload || "Failed to delete category";
-            
-            if (errorMessage.includes('assets') || errorMessage.includes('sub-category') || errorMessage.includes('subcategory')) {
-                // Show warning modal instead of error toast
-                setDeleteModal({ 
-                    open: true, 
-                    categoryId: deleteModal.categoryId, 
-                    name: deleteModal.name,
-                    warning: true,
-                    assetsCount: 0,
-                    assetsList: [],
-                    hasSubCategories: false,
-                    backendError: errorMessage
-                });
-                return; // Don't close modal, show warning instead
-            }
-            
-            // For other types of errors, show toast and close modal
+            // Show backend response in toast
+            const errorMessage = error?.message || error?.data?.message || error?.error || "Failed to delete category";
             toast.error(`Category deletion failed: ${errorMessage}`);
+            console.error('Backend error response:', error);
         }
-        
-        // Close modal only on success or non-asset/subcategory errors
-        setDeleteModal({ 
-            open: false, 
-            categoryId: null, 
-            name: '', 
-            warning: false,
-            assetsCount: 0,
-            assetsList: [],
-            hasSubCategories: false,
-            subCategoriesCount: 0,
-            subCategoriesList: [],
-            backendError: ''
-        });
+        setDeleteModal({ open: false, categoryId: null, name: '' });
     };
     
     const cancelDeleteCategory = () => {
@@ -2704,11 +2441,7 @@ const AssetSettingsPage = () => {
             name: '', 
             warning: false,
             assetsCount: 0,
-            assetsList: [],
-            hasSubCategories: false,
-            subCategoriesCount: 0,
-            subCategoriesList: [],
-            backendError: ''
+            assetsList: []
         });
     };
 
@@ -2791,9 +2524,8 @@ const AssetSettingsPage = () => {
     const handleSaveSubCategory = (categoryId, subCategoryId) => {
         console.log('handleSaveSubCategory called with:', { categoryId, subCategoryId });
         
-        // Ensure we're using the custom categoryId, not MongoDB _id
-        const category = editedCategories.find(cat => cat.categoryId === categoryId);
-        const subCategory = category?.subCategories?.find(sub => sub.subCategoryId === subCategoryId);
+        const category = editedCategories.find(cat => cat.categoryId === categoryId || cat.id === categoryId);
+        const subCategory = category?.subCategories?.find(sub => sub.id === subCategoryId || sub.subCategoryId === subCategoryId);
         
         console.log('Found category and subcategory:', { category, subCategory });
         console.log('All categories:', editedCategories.map(cat => ({
@@ -2858,9 +2590,8 @@ const AssetSettingsPage = () => {
     const handleCancelSubCategory = (categoryId, subCategoryId) => {
         console.log('handleCancelSubCategory called with:', { categoryId, subCategoryId });
         
-        // Ensure we're using the custom categoryId, not MongoDB _id
-        const category = editedCategories.find(cat => cat.categoryId === categoryId);
-        const subCategory = category?.subCategories?.find(sub => sub.subCategoryId === subCategoryId);
+        const category = editedCategories.find(cat => cat.categoryId === categoryId || cat.id === categoryId);
+        const subCategory = category?.subCategories?.find(sub => sub.id === subCategoryId || sub.subCategoryId === subCategoryId);
         
         console.log('Found category and subcategory for cancel:', { category, subCategory });
         
@@ -2892,161 +2623,35 @@ const AssetSettingsPage = () => {
     const handleDeleteSubCategory = async (categoryId, subCategoryId) => {
         console.log('handleDeleteSubCategory called with:', { categoryId, subCategoryId });
         
-        // Ensure we're using the custom categoryId, not MongoDB _id
-        const category = editedCategories.find(cat => cat.categoryId === categoryId);
-        const subCategory = category?.subCategories?.find(sub => sub.subCategoryId === subCategoryId);
+        const category = editedCategories.find(cat => cat.categoryId === categoryId || cat.id === categoryId);
+        const subCategory = category?.subCategories?.find(sub => sub.id === subCategoryId || sub.subCategoryId === subCategoryId);
         
         console.log('Found category and subcategory for deletion:', { category, subCategory });
         
+        // Check if any assets are using this sub-category
+        const assetsUsingSubCategory = assets.filter(asset => 
+            asset.subCategoryId === subCategoryId || asset.subCategory?.id === subCategoryId
+        );
+        
+        if (assetsUsingSubCategory.length > 0) {
+            // Show warning toast about assets using this sub-category
+            const assetList = assetsUsingSubCategory.slice(0, 3).map(asset => asset.name || asset.assetId).join(', ');
+            const moreText = assetsUsingSubCategory.length > 3 ? ` and ${assetsUsingSubCategory.length - 3} more` : '';
+            toast.error(`Cannot delete sub-category "${subCategory?.name || 'Unknown'}" because it has ${assetsUsingSubCategory.length} asset(s) using it: ${assetList}${moreText}. Please change the sub-category of these assets first.`);
+            return;
+        }
+        
         if (subCategory?.subCategoryId) {
-            // Validate subCategoryId before making the request
-            if (!subCategory.subCategoryId || subCategory.subCategoryId === 'undefined' || subCategory.subCategoryId === undefined) {
-                console.error('Invalid subcategory ID:', subCategory.subCategoryId);
-                toast.error('Cannot delete: Invalid subcategory ID');
-                return;
-            }
-            
-            // Try direct API call first to get better error information
+            // Delete from server
             try {
-                console.log('Attempting to delete subcategory with ID:', subCategory.subCategoryId);
-                console.log('Category ID:', categoryId);
-                console.log('Subcategory object:', subCategory);
-                
-                // Get company ID from session storage
-                const companyId = sessionStorage.getItem("employeeCompanyId")
-                
-                if (!companyId) {
-                    toast.error("Company ID not found in session");
-                    return;
-                }
-                
-                // Make direct API call to get better error information
-                const token = getItemFromSessionStorage("token", null)
-                const headers = token ? { Authorization: `Bearer ${token}` } : {};
-                
-                const deleteUrl = `${publicRuntimeConfig.apiURL}/api/asset-settings/sub-categories/${subCategory.subCategoryId}`;
-                console.log('[delete-subcategory] DELETE', deleteUrl);
-                console.log('Headers:', headers);
-                
-                const response = await fetch(deleteUrl, {
-                    method: 'DELETE',
-                    headers: {
-                        ...headers,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                console.log('API Response status:', response.status);
-                console.log('API Response headers:', response.headers);
-                
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    console.error('API Error response:', errorData);
-                    
-                    // Check if the error is about assets using this sub-category
-                    if (errorData.error && errorData.error.includes('assets') && errorData.error.includes('using this sub-category')) {
-                        // Extract asset count from error message
-                        const assetCountMatch = errorData.error.match(/(\d+) asset\(s\)/);
-                        const assetCount = assetCountMatch ? parseInt(assetCountMatch[1]) : 0;
-                        
-                        // Show warning modal instead of error toast
-                        setDeleteSubCategoryModal({ 
-                            open: true, 
-                            categoryId, 
-                            subCategoryId,
-                            subCategoryName: subCategory?.name || 'Unknown',
-                            warning: true,
-                            assetsCount: assetCount,
-                            errorMessage: errorData.error
-                        });
-                        return;
-                    }
-                    
-                    throw new Error(errorData.message || errorData.error || `Sub-category deletion failed (${response.status})`);
-                }
-                
-                const result = await response.json().catch(() => ({}));
-                console.log('Sub-category deletion response:', result);
-                
+                const result = await dispatch(deleteSubCategory({ categoryId, subCategoryId: subCategory.subCategoryId })).unwrap();
+                console.log('Subcategory deleted successfully:', result);
                 toast.success("Sub-category deleted successfully!");
-                
-                // Refresh categories to update the UI
-                dispatch(fetchAssetCategories());
-                
-            } catch (apiError) {
-                console.error('Direct API call failed, trying Redux action as fallback:', apiError);
-                
-                // Check if the API error is about assets using this sub-category
-                if (apiError.message && apiError.message.includes('assets') && apiError.message.includes('using this sub-category')) {
-                    // Extract asset count from error message
-                    const assetCountMatch = apiError.message.match(/(\d+) asset\(s\)/);
-                    const assetCount = assetCountMatch ? parseInt(assetCountMatch[1]) : 0;
-                    
-                    // Show warning modal instead of error toast
-                    setDeleteSubCategoryModal({ 
-                        open: true, 
-                        categoryId, 
-                        subCategoryId,
-                        subCategoryName: subCategory?.name || 'Unknown',
-                        warning: true,
-                        assetsCount: assetCount,
-                        errorMessage: apiError.message
-                    });
-                    return;
-                }
-                
-                // Fallback to Redux action
-                try {
-                    console.log('Trying Redux action as fallback...');
-                    const result = await dispatch(deleteSubCategory({ 
-                        categoryId: categoryId, 
-                        subCategoryId: subCategory.subCategoryId 
-                    })).unwrap();
-                    console.log('Subcategory deleted successfully via Redux:', result);
-                    toast.success("Sub-category deleted successfully via Redux!");
-                    
-                    // Refresh categories to update the UI
-                    dispatch(fetchAssetCategories());
-                    
-                } catch (reduxError) {
-                    console.error('Redux action also failed:', reduxError);
-                    console.error('Redux error details:', {
-                        message: reduxError.message,
-                        stack: reduxError.stack,
-                        payload: reduxError.payload
-                    });
-                    
-                    // Check if the Redux error is about assets using this sub-category
-                    if (reduxError.payload && reduxError.payload.includes('assets') && reduxError.payload.includes('using this sub-category')) {
-                        // Extract asset count from error message
-                        const assetCountMatch = reduxError.payload.match(/(\d+) asset\(s\)/);
-                        const assetCount = assetCountMatch ? parseInt(assetCountMatch[1]) : 0;
-                        
-                        // Show warning modal instead of error toast
-                        setDeleteSubCategoryModal({ 
-                            open: true, 
-                            categoryId, 
-                            subCategoryId,
-                            subCategoryName: subCategory?.name || 'Unknown',
-                            warning: true,
-                            assetsCount: assetCount,
-                            errorMessage: reduxError.payload
-                        });
-                        return;
-                    }
-                    
-                    // Show the most specific error message
-                    let errorMessage = "Failed to delete sub-category";
-                    if (apiError?.message) {
-                        errorMessage = `API Error: ${apiError.message}`;
-                    } else if (reduxError?.payload) {
-                        errorMessage = `Redux Error: ${reduxError.payload}`;
-                    } else if (reduxError?.message) {
-                        errorMessage = `Redux Error: ${reduxError.message}`;
-                    }
-                    
-                    toast.error(errorMessage);
-                }
+            } catch (error) {
+                console.error('Error deleting subcategory:', error);
+                // Show backend response in toast
+                const errorMessage = error?.message || error?.data?.message || error?.error || "Failed to delete sub-category";
+                toast.error(`Sub-category deletion failed: ${errorMessage}`);
             }
         } else {
             // Remove locally (for unsaved sub-categories)
@@ -3518,14 +3123,16 @@ const AssetSettingsPage = () => {
 
     // Location management functions
     const handleAddLocation = async () => {
-        if (!newLocation.name || !newLocation.name.trim()) { 
-            setNewLocation(prev => ({ ...prev, showError: true }));
+        if (!newLocation.name) { 
+            toast.error("Location name is required."); 
             return; 
         }
         
         try {
             // Get company ID from session storage
-            const companyId = sessionStorage.getItem("employeeCompanyId")
+            const companyId = sessionStorage.getItem("employeeCompanyId") || 
+                             sessionStorage.getItem("companyId") || 
+                             sessionStorage.getItem("company");
             
             if (!companyId) {
                 toast.error("Company ID not found in session");
@@ -3545,7 +3152,8 @@ const AssetSettingsPage = () => {
             }
             
             // Make direct API call to add location
-            const token = getItemFromSessionStorage("token", null)
+            const tokenRaw = getItemFromSessionStorage('token', null);
+            const token = typeof tokenRaw === 'string' ? tokenRaw : (tokenRaw?.token || tokenRaw?.accessToken || '');
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
             
             const addUrl = `${publicRuntimeConfig.apiURL}/api/asset-settings/locations`;
@@ -3568,7 +3176,7 @@ const AssetSettingsPage = () => {
             const result = await response.json();
             console.log('Location creation response:', result);
             
-            setNewLocation({ name: '', address: '', showError: false });
+            setNewLocation({ name: '', address: '' });
             toast.success("Location added successfully!");
             
             // Refresh locations from backend to get new data
@@ -3600,7 +3208,9 @@ const AssetSettingsPage = () => {
     const handleBatchUpdateLocations = async (locationsData) => {
         try {
             // Get company ID from session storage
-            const companyId = sessionStorage.getItem("employeeCompanyId")
+            const companyId = sessionStorage.getItem("employeeCompanyId") || 
+                             sessionStorage.getItem("companyId") || 
+                             sessionStorage.getItem("company");
             
             if (!companyId) {
                 toast.error("Company ID not found in session");
@@ -3616,7 +3226,8 @@ const AssetSettingsPage = () => {
             }));
             
             // Make direct API call to batch update locations
-            const token = getItemFromSessionStorage("token", null)
+            const tokenRaw = getItemFromSessionStorage('token', null);
+            const token = typeof tokenRaw === 'string' ? tokenRaw : (tokenRaw?.token || tokenRaw?.accessToken || '');
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
             
             const batchUrl = `${publicRuntimeConfig.apiURL}/api/asset-settings/locations/batch`;
@@ -3658,7 +3269,10 @@ const AssetSettingsPage = () => {
             if (location) {
                 try {
                     // Get company ID from session storage
-                    const companyId = sessionStorage.getItem("employeeCompanyId")
+                    const companyId = sessionStorage.getItem("employeeCompanyId") || 
+                                     sessionStorage.getItem("companyId") || 
+                                     sessionStorage.getItem("company");
+                    
                     if (!companyId) {
                         toast.error("Company ID not found in session");
                         return;
@@ -3677,7 +3291,8 @@ const AssetSettingsPage = () => {
                     }
                     
                     // Make direct API call to update location
-                    const token = getItemFromSessionStorage("token", null)
+                    const tokenRaw = getItemFromSessionStorage('token', null);
+                    const token = typeof tokenRaw === 'string' ? tokenRaw : (tokenRaw?.token || tokenRaw?.accessToken || '');
                     const headers = token ? { Authorization: `Bearer ${token}` } : {};
                     
                     const updateUrl = `${publicRuntimeConfig.apiURL}/api/asset-settings/locations/${location.locationId || location.id}`;
@@ -3786,14 +3401,16 @@ const AssetSettingsPage = () => {
 
     // Status management functions
     const handleAddStatus = async () => {
-        if (!newStatus.name || !newStatus.name.trim()) { 
-            setNewStatus(prev => ({ ...prev, showError: true }));
+        if (!newStatus.name) { 
+            toast.error("Status name is required."); 
             return; 
         }
         
         try {
             // Get company ID from session storage
-            const companyId = sessionStorage.getItem("employeeCompanyId")
+            const companyId = sessionStorage.getItem("employeeCompanyId") || 
+                             sessionStorage.getItem("companyId") || 
+                             sessionStorage.getItem("company");
             
             if (!companyId) {
                 toast.error("Company ID not found in session");
@@ -3812,7 +3429,8 @@ const AssetSettingsPage = () => {
             };
             
             // Make direct API call to add status label
-            const token = getItemFromSessionStorage("token", null)
+            const tokenRaw = getItemFromSessionStorage('token', null);
+            const token = typeof tokenRaw === 'string' ? tokenRaw : (tokenRaw?.token || tokenRaw?.accessToken || '');
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
             
             const addUrl = `${publicRuntimeConfig.apiURL}/api/asset-settings/status-labels`;
@@ -3835,7 +3453,7 @@ const AssetSettingsPage = () => {
             const result = await response.json();
             console.log('Status label creation response:', result);
             
-            setNewStatus({ name: '', showError: false });
+            setNewStatus({ name: '' });
             toast.success("Status label added successfully!");
             
             // Refresh statuses from backend to get new data
@@ -3890,7 +3508,9 @@ const AssetSettingsPage = () => {
     const handleBatchUpdateStatuses = async (statusesData) => {
         try {
             // Get company ID from session storage
-            const companyId = sessionStorage.getItem("employeeCompanyId")
+            const companyId = sessionStorage.getItem("employeeCompanyId") || 
+                             sessionStorage.getItem("companyId") || 
+                             sessionStorage.getItem("company");
             
             if (!companyId) {
                 toast.error("Company ID not found in session");
@@ -3913,7 +3533,8 @@ const AssetSettingsPage = () => {
             let successCount = 0;
             for (const statusData of batchPayload) {
                 try {
-                    const token = getItemFromSessionStorage("token", null)
+                    const tokenRaw = getItemFromSessionStorage('token', null);
+                    const token = typeof tokenRaw === 'string' ? tokenRaw : (tokenRaw?.token || tokenRaw?.accessToken || '');
                     const headers = token ? { Authorization: `Bearer ${token}` } : {};
                     
                     const updateUrl = `${publicRuntimeConfig.apiURL}/api/asset-settings/status-labels/${statusData.statusLabelId}`;
@@ -3992,7 +3613,10 @@ const AssetSettingsPage = () => {
                 
                 try {
                     // Get company ID from session storage
-                    const companyId = sessionStorage.getItem("employeeCompanyId")
+                    const companyId = sessionStorage.getItem("employeeCompanyId") || 
+                                     sessionStorage.getItem("companyId") || 
+                                     sessionStorage.getItem("company");
+                    
                     console.log('Company ID from session:', companyId);
                     
                     if (!companyId) {
@@ -4016,7 +3640,8 @@ const AssetSettingsPage = () => {
                     
                     // Try direct API call first
                     try {
-                        const token = getItemFromSessionStorage("token", null)
+                        const tokenRaw = getItemFromSessionStorage('token', null);
+                        const token = typeof tokenRaw === 'string' ? tokenRaw : (tokenRaw?.token || tokenRaw?.accessToken || '');
                         const headers = token ? { Authorization: `Bearer ${token}` } : {};
                         
                         // Use the correct API endpoint based on the documentation
@@ -4247,63 +3872,6 @@ const AssetSettingsPage = () => {
         setDeleteFormModal({ open: false, formId: null, formName: '' });
     };
 
-    const cancelDeleteSubCategory = () => {
-        setDeleteSubCategoryModal({ 
-            open: false, 
-            categoryId: null, 
-            subCategoryId: null,
-            subCategoryName: '',
-            warning: false,
-            assetsCount: 0,
-            errorMessage: ''
-        });
-    };
-
-    const confirmDeleteSubCategory = async () => {
-        const { categoryId, subCategoryId } = deleteSubCategoryModal;
-        
-        if (!categoryId || !subCategoryId) {
-            toast.error('Invalid sub-category information');
-            return;
-        }
-        
-        try {
-            // Try to delete again (in case assets were reassigned)
-            const result = await dispatch(deleteSubCategory({ 
-                categoryId, 
-                subCategoryId 
-            })).unwrap();
-            
-            console.log('Sub-category deleted successfully:', result);
-            toast.success("Sub-category deleted successfully!");
-            
-            // Refresh categories to update the UI
-            dispatch(fetchAssetCategories());
-            
-        } catch (error) {
-            console.error('Error deleting sub-category:', error);
-            
-            // Check if the error is still about assets using this sub-category
-            if (error?.payload && error.payload.includes('assets') && error.payload.includes('using this sub-category')) {
-                toast.error("Sub-category still has assets assigned to it. Please reassign or delete those assets first.");
-            } else {
-                const errorMessage = error?.payload || error?.message || "Failed to delete sub-category";
-                toast.error(`Sub-category deletion failed: ${errorMessage}`);
-            }
-        }
-        
-        // Close the modal
-        setDeleteSubCategoryModal({ 
-            open: false, 
-            categoryId: null, 
-            subCategoryId: null,
-            subCategoryName: '',
-            warning: false,
-            assetsCount: 0,
-            errorMessage: ''
-        });
-    };
-
     // ID Format Management placeholder functions (implement as needed)
     const handleAddIdFormat = (categoryId) => {
         console.log('Add ID format for category:', categoryId);
@@ -4429,10 +3997,6 @@ const AssetSettingsPage = () => {
                 warning={deleteModal.warning}
                 assetsCount={deleteModal.assetsCount}
                 assetsList={deleteModal.assetsList}
-                hasSubCategories={deleteModal.hasSubCategories}
-                subCategoriesCount={deleteModal.subCategoriesCount}
-                subCategoriesList={deleteModal.subCategoriesList}
-                backendError={deleteModal.backendError}
             />
                         <DeleteLocationModal 
                 open={deleteLocationModal.open} 
@@ -4458,15 +4022,6 @@ const AssetSettingsPage = () => {
                 onConfirm={confirmDeleteForm} 
                 formName={deleteFormModal.formName}
             />
-            <DeleteSubCategoryModal 
-                open={deleteSubCategoryModal.open} 
-                onClose={cancelDeleteSubCategory} 
-                onConfirm={confirmDeleteSubCategory} 
-                subCategoryName={deleteSubCategoryModal.subCategoryName}
-                warning={deleteSubCategoryModal.warning}
-                assetsCount={deleteSubCategoryModal.assetsCount}
-                errorMessage={deleteSubCategoryModal.errorMessage}
-            />
             <div className="p-6">
                 <header className="mb-6">
                     <div className="flex justify-between items-center">
@@ -4474,56 +4029,9 @@ const AssetSettingsPage = () => {
                             <h1 className="text-3xl font-bold text-gray-800">Asset Management Settings</h1>
                             <p className="text-gray-500 mt-1">Configure and standardize your company&apos;s asset tracking system.</p>
                         </div>
-                        
-                        {/* Network Status Indicator */}
-                        <div className="flex items-center gap-3">
-                            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                                networkStatus.isOnline && networkStatus.apiHealth?.isHealthy
-                                    ? 'bg-green-100 text-green-700'
-                                    : networkStatus.isOnline
-                                    ? 'bg-yellow-100 text-yellow-700'
-                                    : 'bg-red-100 text-red-700'
-                            }`}>
-                                <div className={`w-2 h-2 rounded-full ${
-                                    networkStatus.isOnline && networkStatus.apiHealth?.isHealthy
-                                        ? 'bg-green-500'
-                                        : networkStatus.isOnline
-                                        ? 'bg-yellow-500'
-                                        : 'bg-red-500'
-                                }`}></div>
-                                <span>
-                                    {networkStatus.isOnline && networkStatus.apiHealth?.isHealthy
-                                        ? 'Online'
-                                        : networkStatus.isOnline
-                                        ? 'API Offline'
-                                        : 'Offline'
-                                    }
-                                </span>
-                            </div>
-                            
-                            {networkStatus.lastChecked && (
-                                <button
-                                    onClick={async () => {
-                                        const apiHealth = await checkAssetApiHealth();
-                                        setNetworkStatus(prev => ({ 
-                                            ...prev, 
-                                            apiHealth,
-                                            lastChecked: new Date()
-                                        }));
-                                        if (apiHealth.isHealthy) {
-                                            toast.success('API connection restored!');
-                                        } else {
-                                            toast.error('API still offline');
-                                        }
-                                    }}
-                                    className="text-blue-600 hover:text-blue-800 text-sm"
-                                    title="Check API Status"
-                                >
-                                    🔄
-                                </button>
-                            )}
-                        </div>
                     </div>
+                    
+
                 </header>
                 
                 {/* Horizontal Navigation Tabs */}
