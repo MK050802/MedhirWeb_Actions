@@ -1,0 +1,42 @@
+name: Build, Test and Auto PR (Frontend)
+
+on:
+  push:
+    branches:
+      - "**" # runs on push to any branch
+
+jobs:
+  build-test-create-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20" # use Node.js 20 (recommended for Next.js)
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Run Tests
+        run: npm test # make sure you add "test": "jest" or similar in package.json
+
+      - name: Create Pull Request (if not main branch)
+        if: success() && github.ref != 'refs/heads/main'
+        run: |
+          BRANCH_NAME="${GITHUB_REF##*/}"
+          curl -X POST "${GITHUB_API_URL}/repos/${{ github.repository }}/pulls" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "head": "'$BRANCH_NAME'",
+              "base": "main",
+              "title": "Auto PR from '$BRANCH_NAME'",
+              "body": "Auto-created after successful build and tests."
+            }'
