@@ -1,0 +1,57 @@
+name: Build, Test and Auto PR (Frontend)
+
+on:
+  push:
+    branches:
+      - "**" # Runs on push to any branch
+
+jobs:
+  build-test-create-pr:
+    runs-on: gitea_runner_01 # Use your registered Gitea runner name here
+
+    env:
+      NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_DEV_URL }}
+      NEXT_PUBLIC_ATTENDANCE_URL: ${{ secrets.NEXT_PUBLIC_ATTENDANCE_DEV_URL }}
+
+    steps:
+      - name: Set URLs for production branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_PROD_URL }}" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_ATTENDANCE_URL=${{ secrets.NEXT_PUBLIC_ATTENDANCE_PROD_URL }}" >> $GITHUB_ENV
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Run Tests
+        run: npm test # Ensure "test" script is defined in package.json
+
+      - name: Create Pull Request (if not main branch)
+        if: success() && github.ref != 'refs/heads/main'
+        run: |
+          BRANCH_NAME="${GITHUB_REF##*/}"
+          curl -X POST "${GITEA_URL}/api/v1/repos/${OWNER}/${REPO}/pulls" \
+            -H "Authorization: token ${GITEA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "head": "'$BRANCH_NAME'",
+              "base": "main",
+              "title": "Auto PR from '$BRANCH_NAME'",
+              "body": "Auto-created after successful build and tests."
+            }'
+        env:
+          GITEA_URL: https://git.home.medhir.in
+          OWNER: jadhav.manoj
+          REPO: nayati-frontend
+          GITEA_TOKEN: ${{ secrets.TOKEN_GITEA }}
