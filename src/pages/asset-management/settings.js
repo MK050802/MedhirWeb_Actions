@@ -1829,7 +1829,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                         </div>
                         {searchTerm.trim() && (
                             <p className="text-sm text-gray-500 mt-1">
-                                Found {filteredForms?.length || 0} form(s) matching "{searchTerm}"
+                                Found {filteredForms?.length || 0} form(s) matching &quot;{searchTerm}&quot;
                             </p>
                         )}
                     </div>
@@ -1849,7 +1849,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                             </h4>
                             <p className="mb-4">
                                 {searchTerm.trim() 
-                                    ? `No forms match "${searchTerm}". Try a different search term.`
+                                    ? `No forms match &quot;{searchTerm}&quot;. Try a different search term.`
                                     : 'Create your first custom form to get started'
                                 }
                             </p>

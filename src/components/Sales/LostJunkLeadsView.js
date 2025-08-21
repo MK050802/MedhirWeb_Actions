@@ -6,7 +6,6 @@ import DateFilter from './filter';
 import { useDispatch } from 'react-redux';
 import { fetchManagerEmployees } from '@/redux/slices/managerEmployeeSlice';
 import SearchBar from './SearchBar';
-import ViewToggle from './ViewToggle';
 
 const LostJunkLeadsView = ({ isManager, dateFilterProps = {}, onFilterChange, onResetFilter }) => {
   const router = useRouter();
@@ -17,7 +16,7 @@ const LostJunkLeadsView = ({ isManager, dateFilterProps = {}, onFilterChange, on
   const [filterText, setFilterText] = useState("");
   const dispatch = useDispatch();
   const { employees: managerEmployees, loading: managerEmployeesLoading } = useSelector((state) => state.managerEmployee);
-  const [viewMode, setViewMode] = useState('grid');
+
   useEffect(() => {
     dispatch(fetchManagerEmployees());
   }, [dispatch]);
@@ -291,10 +290,6 @@ const LostJunkLeadsView = ({ isManager, dateFilterProps = {}, onFilterChange, on
             title="Lead Date Filter"
             compact={true}
           />
-          <ViewToggle
-            viewMode={viewMode} 
-            setViewMode={setViewMode}
-          />
           </div>
           </div>
       </div>
@@ -360,6 +355,9 @@ const LostJunkLeadsView = ({ isManager, dateFilterProps = {}, onFilterChange, on
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Priority
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date of Lost
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -387,6 +385,9 @@ const LostJunkLeadsView = ({ isManager, dateFilterProps = {}, onFilterChange, on
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {lead.priority || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDate(lead.dateOfLost)}
                           </td>
                         </tr>
                       ))}
@@ -427,6 +428,9 @@ const LostJunkLeadsView = ({ isManager, dateFilterProps = {}, onFilterChange, on
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Priority
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date of Junk
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -454,6 +458,9 @@ const LostJunkLeadsView = ({ isManager, dateFilterProps = {}, onFilterChange, on
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {lead.priority || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDate(lead.dateOfJunk)}
                           </td>
                         </tr>
                       ))}

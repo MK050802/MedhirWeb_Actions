@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect, useMemo } from "react";
 import { Search, Calendar, Check, X, Pencil } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import HradminNavbar from "@/components/HradminNavbar";
@@ -16,6 +16,7 @@ import { updateArrearsPaid, updateArrearsDeducted, fetchCompanyArrears } from "@
 import { fetchPayrollFreezeSettings } from "@/redux/slices/payrollSettingsSlice";
 
 function PayrollManagement() {
+  debugger
   const selectedCompanyId = sessionStorage.getItem("employeeCompanyId");
   const dispatch = useDispatch();
 
@@ -55,7 +56,9 @@ function PayrollManagement() {
   const [hasAttemptedCalculate, setHasAttemptedCalculate] = useState(false);
   const [isFetchingView, setIsFetchingView] = useState(false);
   const [dataLastUpdated, setDataLastUpdated] = useState(null);
+  const [isApiCallInProgress, setIsApiCallInProgress] = useState(false);
   const [editingArrears, setEditingArrears] = useState({});
+  const [apiCallTimeoutId, setApiCallTimeoutId] = useState(null);
   const [arrearsValues, setArrearsValues] = useState([]);
   const [originalArrearsValues, setOriginalArrearsValues] = useState({});
   const [editingArrearsDeducted, setEditingArrearsDeducted] = useState({});
@@ -64,7 +67,7 @@ function PayrollManagement() {
   const [editingAdvance, setEditingAdvance] = useState({});
   const [advanceValues, setAdvanceValues] = useState({});
   const [originalAdvanceValues, setOriginalAdvanceValues] = useState({});
-  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const [selectedMonth, setSelectedMonth] = useState(() => {
     const currentDate = new Date();
     const latestAvailableMonth = new Date(
       currentDate.getFullYear(),
@@ -82,6 +85,19 @@ function PayrollManagement() {
     );
     return latestAvailableMonth.getFullYear().toString();
   });
+
+  // Add logging for state changes
+  useEffect(() => {
+    console.log('📅 selectedMonth changed to:', selectedMonth);
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    console.log('📅 selectedYear changed to:', selectedYear);
+  }, [selectedYear]);
+
+  useEffect(() => {
+    console.log('🏢 selectedCompanyId changed to:', selectedCompanyId);
+  }, [selectedCompanyId]);
 
   const { employees, loading, err } = useSelector((state) => state.employees);
 
@@ -105,6 +121,34 @@ function PayrollManagement() {
     if (diffInDays === 1) return "1 day back";
     return `${diffInDays} days back`;
   };
+
+  // Memoize the params object to prevent unnecessary re-renders
+  const memoizedParams = useMemo(() => {
+    if (!selectedCompanyId || !selectedMonth || !selectedYear) {
+      return null;
+    }
+
+    const monthMap = {
+      January: 1,
+      February: 2,
+      March: 3,
+      April: 4,
+      May: 5,
+      June: 6,
+      July: 7,
+      August: 8,
+      September: 9,
+      October: 10,
+      November: 11,
+      December: 12,
+    };
+
+    return {
+      companyId: selectedCompanyId,
+      year: parseInt(selectedYear),
+      month: monthMap[selectedMonth],
+    };
+  }, [selectedCompanyId, selectedMonth, selectedYear]);
 
   // Helper functions for arrears editing
   const handleArrearsEdit = (employeeId) => {
@@ -582,41 +626,45 @@ function PayrollManagement() {
 
 
   useEffect(() => {
-    // Only fetch payroll data if we have a valid company ID and month/year
-    if (!selectedCompanyId || !selectedMonth || !selectedYear) {
+    console.log('🔍 Payroll useEffect triggered with:', { 
+      selectedCompanyId, 
+      selectedMonth, 
+      selectedYear,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Only fetch payroll data if we have valid memoized params
+    if (!memoizedParams) {
+      console.log('❌ No memoized params, skipping API call');
       return;
     }
 
-    // Convert month name to month number
-    const monthMap = {
-      January: 1,
-      February: 2,
-      March: 3,
-      April: 4,
-      May: 5,
-      June: 6,
-      July: 7,
-      August: 8,
-      September: 9,
-      October: 10,
-      November: 11,
-      December: 12,
-    };
+    // Prevent multiple simultaneous API calls
+    if (isApiCallInProgress) {
+      console.log('⏸️ API call already in progress, skipping');
+      return;
+    }
 
-    const params = {
-      companyId: selectedCompanyId,
-      year: parseInt(selectedYear),
-      month: monthMap[selectedMonth],
-    };
+    console.log('📡 About to make API call with params:', memoizedParams);
+
+    // Clear any existing timeout
+    if (apiCallTimeoutId) {
+      clearTimeout(apiCallTimeoutId);
+    }
 
     // Add a small delay to prevent rapid successive calls
     const timeoutId = setTimeout(() => {
+      console.log('⏰ Timeout executed, making API call');
+      
+      // Set flag to prevent multiple calls
+      setIsApiCallInProgress(true);
+      
       // First clear any stale error and fetch; hide UI until resolved
       setPayrollErrorDetails(null);
       setIsFetchingView(true);
       (async () => {
         try {
-          await dispatch(getPayroll(params)).unwrap();
+          await dispatch(getPayroll(memoizedParams)).unwrap();
           setPayrollErrorDetails(null);
           // If payroll data exists, automatically set as calculated
           if (payroll && Array.isArray(payroll) && payroll.length > 0) {
@@ -640,13 +688,20 @@ function PayrollManagement() {
           setOriginalAdvanceValues({});
         } finally {
           setIsFetchingView(false);
+          setIsApiCallInProgress(false); // Reset flag
         }
       })();
-    }, 300); // 300ms delay
+    }, 500); // Increased to 500ms for better debouncing
+
+    // Store the timeout ID for cleanup
+    setApiCallTimeoutId(timeoutId);
 
     // Cleanup timeout on unmount or dependency change
-    return () => clearTimeout(timeoutId);
-  }, [dispatch, selectedCompanyId, selectedMonth, selectedYear, payroll]);
+    return () => {
+      console.log('🧹 Cleaning up timeout');
+      clearTimeout(timeoutId);
+    };
+  }, [dispatch, memoizedParams, isApiCallInProgress, apiCallTimeoutId]);
 
   // Initialize arrears values when payroll data is loaded
   useEffect(() => {
