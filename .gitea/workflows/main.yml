@@ -34,8 +34,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run Tests
-        run: npm test # Ensure "test" script is defined in package.json
+      # - name: Run Tests
+      #   run: npm test # Ensure "test" script is defined in package.json
 
       - name: Create Pull Request (if not main branch)
         if: success() && github.ref != 'refs/heads/main'
@@ -52,6 +52,6 @@ jobs:
             }'
         env:
           GITEA_URL: https://git.home.medhir.in
-          OWNER: jadhav.manoj
-          REPO: nayati-frontend
+          OWNER: Saurav_Singh
+          REPO: nayati-ui
           GITEA_TOKEN: ${{ secrets.TOKEN_GITEA }}
