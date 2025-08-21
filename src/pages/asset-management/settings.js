@@ -38,7 +38,7 @@ import {
     removeSubCategoryLocal
 } from '@/redux/slices/assetCategorySlice';
 
-import { checkAssetApiHealth } from '@/redux/slices/assetSlice';
+
 
 import { 
     fetchAssetLocations, 
@@ -138,9 +138,23 @@ const getCompanyId = () => {
 
 // Helper function to get the correct form ID (prefer formId over id to avoid MongoDB ObjectId)
 const getFormId = (form) => {
+    // Add defensive programming to handle undefined/null forms
+    if (!form || typeof form !== 'object') {
+        console.warn('getFormId called with invalid form:', form);
+        return null;
+    }
+    
     // For new forms, use formId; for old forms, use id
     // This ensures we're using the custom form ID, not the MongoDB ObjectId
-    return form.formId || form.id;
+    const formId = form.formId || form.id;
+    
+    // Additional validation to ensure we have a valid ID
+    if (!formId || formId === 'undefined' || formId === undefined) {
+        console.warn('getFormId: Form has no valid ID:', { form, formId });
+        return null;
+    }
+    
+    return formId;
 };
 
 // Helper component for a consistent setting section layout
@@ -242,7 +256,7 @@ const CategorySettings = ({
             
             {/* Step 2: Category Cards with Sub-Categories */}
             <div className="space-y-6">
-                {editedCategories.map(cat => {
+                {editedCategories && Array.isArray(editedCategories) ? editedCategories.filter(cat => cat && typeof cat === 'object').map(cat => {
                     // Ensure we're using the custom categoryId, not MongoDB _id
         const categoryId = cat.categoryId;
                     const subCategories = cat.subCategories || [];
@@ -581,10 +595,10 @@ const CategorySettings = ({
 
                         </div>
                     );
-                })}
+                }) : null}
                 
                 {/* Empty State for Categories */}
-                {editedCategories.length === 0 && (
+                {(!editedCategories || editedCategories.length === 0) && (
                     <div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
                         <div className="text-4xl mb-4">📁</div>
                         <h4 className="text-lg font-semibold mb-2">No categories yet</h4>
@@ -831,6 +845,10 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
     const [fields, setFields] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    
+    // Performance optimization: Debounced search for better responsiveness
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
     // Load forms and categories on component mount
     useEffect(() => {
@@ -840,6 +858,27 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
         }
         dispatch(fetchAssetCategories()); // Always load categories upfront
     }, [dispatch]);
+
+    // Debug effect to monitor forms data
+    useEffect(() => {
+        console.log('=== FORMS DATA MONITORING ===');
+        console.log('Forms from Redux:', forms);
+        console.log('Forms type:', typeof forms);
+        console.log('Forms is array:', Array.isArray(forms));
+        if (forms && Array.isArray(forms)) {
+            console.log('Forms count:', forms.length);
+            console.log('Forms structure:', forms.map((form, index) => ({
+                index,
+                hasForm: !!form,
+                type: typeof form,
+                name: form?.name,
+                id: form?.id,
+                formId: form?.formId,
+                keys: form ? Object.keys(form) : []
+            })));
+        }
+        console.log('=== END FORMS MONITORING ===');
+    }, [forms]);
 
     // Load categories for form creation (backup)
     useEffect(() => {
@@ -860,11 +899,31 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
             selectedCategory,
             matchingCategory: matchingCategory?.name,
             subCategoriesCount: subCategories.length,
-            subCategories: subCategories.map(sub => ({ id: sub.id, subCategoryId: sub.subCategoryId, name: sub.name }))
+            subCategories: subCategories.filter(sub => sub && typeof sub === 'object').map(sub => ({ id: sub.id, subCategoryId: sub.subCategoryId, name: sub.name }))
         });
         
         return subCategories;
     }, [selectedCategory, categories]);
+    
+    // Performance optimization: Filtered forms list for better search performance
+    const filteredForms = useMemo(() => {
+        if (!forms || !Array.isArray(forms)) return [];
+        if (!debouncedSearchTerm.trim()) return forms;
+        
+        const searchLower = debouncedSearchTerm.toLowerCase();
+        return forms.filter(form => 
+            form && form.name && form.name.toLowerCase().includes(searchLower)
+        );
+    }, [forms, debouncedSearchTerm]);
+    
+    // Performance optimization: Limit displayed forms for better rendering performance
+    const displayForms = useMemo(() => {
+        if (!filteredForms || filteredForms.length === 0) return [];
+        
+        // For better performance, limit to first 50 forms initially
+        // This prevents rendering issues with very large lists
+        return filteredForms.slice(0, 50);
+    }, [filteredForms]);
 
     // When category changes, clear sub-category if it doesn't belong to the category
     useEffect(() => {
@@ -883,7 +942,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
     useEffect(() => {
         if (view === 'edit' && editingFormId && categories.length > 0) {
             // Use the helper function to find the form by ID
-            const form = forms.find(f => getFormId(f) === editingFormId);
+            const form = forms && Array.isArray(forms) ? forms.find(f => f && getFormId(f) === editingFormId) : null;
             const formCategoryId = form?.categoryId || form?.assignedCategoryId;
             
             if (form && formCategoryId) {
@@ -892,7 +951,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                     formAssignedCategoryId: form.assignedCategoryId,
                     actualCategoryId: formCategoryId,
                     currentSelectedCategory: selectedCategory,
-                    availableCategories: categories.map(c => ({ id: c.id, categoryId: c.categoryId, name: c.name }))
+                    availableCategories: categories && Array.isArray(categories) ? categories.filter(c => c && typeof c === 'object').map(c => ({ id: c.id, categoryId: c.categoryId, name: c.name })) : []
                 });
                 
                 // Find matching category ID (form category might match either cat.id or cat.categoryId)
@@ -923,9 +982,9 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
 
     // Ensure fields are properly mapped when form data is available
     useEffect(() => {
-        if (view === 'edit' && editingFormId && forms.length > 0) {
+        if (view === 'edit' && editingFormId && forms && Array.isArray(forms) && forms.length > 0) {
             // Use the helper function to find the form by ID
-            const form = forms.find(f => getFormId(f) === editingFormId);
+            const form = forms && Array.isArray(forms) ? forms.find(f => f && getFormId(f) === editingFormId) : null;
             if (form && form.fields && form.fields.length > 0) {
                 const currentFieldsCount = fields.length;
                 const apiFieldsCount = form.fields.length;
@@ -967,11 +1026,20 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
             editingFormId
         });
     }, [selectedSubCategory, view, editingFormId]);
+    
+    // Performance optimization: Debounced search for better responsiveness
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 300); // 300ms delay for better performance
+        
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     // Simple effect to ensure subcategory is set when editing starts
     useEffect(() => {
-        if (view === 'edit' && editingFormId && forms.length > 0) {
-            const form = forms.find(f => getFormId(f) === editingFormId);
+        if (view === 'edit' && editingFormId && forms && Array.isArray(forms) && forms.length > 0) {
+            const form = forms && Array.isArray(forms) ? forms.find(f => f && getFormId(f) === editingFormId) : null;
             if (form) {
                 const formSubCatId = form?.assignedSubCategoryId || form?.subCategoryId || form?.subCategory?.id;
                 if (formSubCatId && !selectedSubCategory) {
@@ -1039,8 +1107,21 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
 
     const handleEditForm = (formId) => {
         // Use the helper function to find the form by ID
-        const form = forms.find(f => getFormId(f) === formId);
+        const form = forms && Array.isArray(forms) ? forms.find(f => f && getFormId(f) === formId) : null;
         console.log('handleEditForm called with:', { formId, form, categoriesCount: categories?.length });
+        
+        // Validate form data before proceeding
+        if (!form || typeof form !== 'object') {
+            console.error('Invalid form data:', form);
+            toast.error('Invalid form data. Please refresh the page and try again.');
+            return;
+        }
+        
+        if (!form.name) {
+            console.error('Form missing name property:', form);
+            toast.error('Form data is incomplete. Please refresh the page and try again.');
+            return;
+        }
         
         // Log the raw form data to see exactly what we're working with
         console.log('=== RAW FORM DATA ===');
@@ -1146,7 +1227,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
     const handleToggleFormStatus = async (formId) => {
         try {
             // Use the helper function to find the form by ID
-            const form = forms.find(f => getFormId(f) === formId);
+            const form = forms && Array.isArray(forms) ? forms.find(f => f && getFormId(f) === formId) : null;
             if (form) {
                 await dispatch(toggleFormStatus({ 
                     formId, 
@@ -1450,23 +1531,65 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
             let savedFormId = editingFormId;
             if (editingFormId) {
                 console.log('Updating existing form with ID:', editingFormId);
+                
+                // OPTIMISTIC UPDATE: Immediately update the local forms state for instant UI feedback
+                const currentForms = forms || [];
+                const updatedForms = currentForms.map(form => {
+                    if (getFormId(form) === editingFormId) {
+                        return {
+                            ...form,
+                            name: formData.name,
+                            categoryId: formData.categoryId,
+                            assignedCategoryId: formData.categoryId,
+                            subCategoryId: formData.subCategoryId,
+                            assignedSubCategoryId: formData.subCategoryId,
+                            fields: formData.fields,
+                            updatedAt: new Date().toISOString()
+                        };
+                    }
+                    return form;
+                });
+                
+                // Update Redux state immediately for instant UI feedback
+                dispatch(setCurrentForm({
+                    ...currentForms.find(f => getFormId(f) === editingFormId),
+                    name: formData.name,
+                    categoryId: formData.categoryId,
+                    assignedCategoryId: formData.categoryId,
+                    subCategoryId: formData.subCategoryId,
+                    assignedSubCategoryId: formData.subCategoryId,
+                    fields: formData.fields,
+                    updatedAt: new Date().toISOString()
+                }));
+                
                 const updated = await dispatch(updateCustomForm({ 
                     formId: editingFormId, 
-                    formDTO: formData 
+                    formData: formData 
                 })).unwrap();
                 savedFormId = updated?.id || updated?.formId || editingFormId;
+                
+                // Show success message immediately
                 const successMessage = selectedSubCategory 
                     ? `Form updated successfully with subcategory assignment!`
                     : "Form updated successfully!";
                 toast.success(successMessage);
+                
+                // Refresh forms data in background for consistency (non-blocking)
+                dispatch(fetchCustomForms({ companyId })).catch(console.error);
+                
             } else {
                 console.log('Creating new form');
                 const created = await dispatch(createCustomForm(formData)).unwrap();
                 savedFormId = created?.id || created?.formId || created?.data?.id;
+                
+                // Show success message immediately
                 const successMessage = selectedSubCategory 
                     ? `Form created successfully with subcategory assignment!`
                     : "Form created successfully!";
                 toast.success(successMessage);
+                
+                // Refresh forms data in background for consistency (non-blocking)
+                dispatch(fetchCustomForms({ companyId })).catch(console.error);
             }
 
             // The subCategoryId is now included in the main form data, so no separate assignment needed
@@ -1476,7 +1599,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                 toast.success("Form saved with subcategory assignment successfully!");
             }
             
-            // Return to listing view
+            // Return to listing view immediately
             handleBackToList();
             
         } catch (error) {
@@ -1602,7 +1725,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                 <h4 className="font-semibold text-gray-800 mb-4">Form Preview</h4>
                 <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
                     <h3 className="text-xl font-bold text-gray-800">{formName || 'Untitled Form'}</h3>
-                    {fields.map(field => (
+                    {fields && Array.isArray(fields) ? fields.filter(field => field && typeof field === 'object').map(field => (
                         <div key={field.id} className="space-y-2">
                             <label className="block text-sm font-medium text-gray-700">
                                 {field.name}
@@ -1667,7 +1790,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                 />
                             )}
                         </div>
-                    ))}
+                    )) : null}
                 </div>
             </div>
         );
@@ -1687,23 +1810,57 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                             <FaPlus /> New Form
                         </button>
                     </div>
+                    
+                    {/* Performance optimization: Search input for better form discovery */}
+                    <div className="mb-4">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="🔍 Search forms by name..."
+                                className="w-full max-w-md p-3 border border-gray-300 rounded-md text-base pr-10"
+                            />
+                            {searchTerm !== debouncedSearchTerm && (
+                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                </div>
+                            )}
+                        </div>
+                        {searchTerm.trim() && (
+                            <p className="text-sm text-gray-500 mt-1">
+                                Found {filteredForms?.length || 0} form(s) matching "{searchTerm}"
+                            </p>
+                        )}
+                    </div>
 
                     {formsLoading ? (
                         <div className="text-center py-12">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
                             <p className="mt-4 text-gray-600">Loading forms...</p>
                         </div>
-                    ) : forms.length === 0 ? (
+                    ) : (!filteredForms || filteredForms.length === 0 || filteredForms.every(form => !form || !form.name)) ? (
                         <div className="text-center py-12 text-gray-500">
-                            <div className="text-4xl mb-4">📝</div>
-                            <h4 className="text-lg font-semibold mb-2">No forms created yet</h4>
-                            <p className="mb-4">Create your first custom form to get started</p>
-                            <button
-                                onClick={handleNewForm}
-                                className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                            >
-                                Create Your First Form
-                            </button>
+                            <div className="text-4xl mb-4">
+                                {searchTerm.trim() ? '🔍' : '📝'}
+                            </div>
+                            <h4 className="text-lg font-semibold mb-2">
+                                {searchTerm.trim() ? 'No forms found' : 'No forms created yet'}
+                            </h4>
+                            <p className="mb-4">
+                                {searchTerm.trim() 
+                                    ? `No forms match "${searchTerm}". Try a different search term.`
+                                    : 'Create your first custom form to get started'
+                                }
+                            </p>
+                            {!searchTerm.trim() && (
+                                <button
+                                    onClick={handleNewForm}
+                                    className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                >
+                                    Create Your First Form
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -1716,13 +1873,20 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {forms.map((form) => (
+                                    {displayForms && Array.isArray(displayForms) ? displayForms.filter(form => form && typeof form === 'object' && form.name && getFormId(form)).map((form) => (
                                         <tr 
                                             key={getFormId(form)} 
                                             className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                                            onClick={() => handleEditForm(getFormId(form))}
+                                            onClick={() => {
+                                                const formId = getFormId(form);
+                                                if (formId) {
+                                                    handleEditForm(formId);
+                                                } else {
+                                                    toast.error('Cannot edit: Invalid form ID');
+                                                }
+                                            }}
                                         >
-                                            <td className="p-4 font-medium">{form.name}</td>
+                                            <td className="p-4 font-medium">{form.name || 'Unnamed Form'}</td>
                                             <td className="p-4 text-gray-600">
                                                 {(() => {
                                                     const formCategoryId = form.categoryId || form.assignedCategoryId;
@@ -1737,7 +1901,12 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleEditForm(getFormId(form));
+                                                            const formId = getFormId(form);
+                                                            if (formId) {
+                                                                handleEditForm(formId);
+                                                            } else {
+                                                                toast.error('Cannot edit: Invalid form ID');
+                                                            }
                                                         }}
                                                         className="text-blue-600 hover:text-blue-800"
                                                         title="Edit Form"
@@ -1748,7 +1917,12 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            onDeleteForm(getFormId(form));
+                                                            const formId = getFormId(form);
+                                                            if (formId) {
+                                                                onDeleteForm(formId);
+                                                            } else {
+                                                                toast.error('Cannot delete: Invalid form ID');
+                                                            }
                                                         }}
                                                         className="text-red-600 hover:text-red-800"
                                                         title="Delete Form"
@@ -1758,9 +1932,31 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))}
+                                    )) : (
+                                        <tr>
+                                            <td colSpan="3" className="p-4 text-center text-gray-500">
+                                                No forms available
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
+                        </div>
+                    )}
+                    
+                    {/* Performance optimization: Show more button for large lists */}
+                    {filteredForms && filteredForms.length > 50 && (
+                        <div className="text-center mt-4">
+                            <button
+                                onClick={() => {
+                                    // For now, just show a message. In a real implementation, 
+                                    // you could implement pagination or virtual scrolling
+                                    toast.info(`Showing first 50 of ${filteredForms.length} forms. Use search to find specific forms.`);
+                                }}
+                                className="px-4 py-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            >
+                                📊 Showing 50 of {filteredForms.length} forms
+                            </button>
                         </div>
                     )}
                 </div>
@@ -1810,11 +2006,11 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                             disabled={categoriesLoading}
                                         >
                                             <option value="">Select a category...</option>
-                                            {categories.map(cat => (
+                                            {categories && Array.isArray(categories) ? categories.filter(cat => cat && typeof cat === 'object').map(cat => (
                                                 <option key={cat.categoryId || cat.id} value={cat.categoryId || cat.id}>
                                                     {cat.name}
                                                 </option>
-                                            ))}
+                                            )) : []}
                                         </select>
                                         {categoriesLoading && <div className="text-blue-600 text-sm mt-1">Loading categories...</div>}
                                     </div>
@@ -1841,11 +2037,11 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                             disabled={!selectedCategory || categoriesLoading}
                                         >
                                             <option value="">Select a sub-category...</option>
-                                            {subCategoriesForSelectedCategory.map(sub => (
+                                            {subCategoriesForSelectedCategory && Array.isArray(subCategoriesForSelectedCategory) ? subCategoriesForSelectedCategory.filter(sub => sub && typeof sub === 'object').map(sub => (
                                                 <option key={sub.subCategoryId || sub.id} value={sub.subCategoryId || sub.id}>
                                                     {sub.name}
                                                 </option>
-                                            ))}
+                                            )) : []}
                                         </select>
                                         {selectedSubCategory && (
                                             <p className="text-xs text-gray-500 mt-1">
@@ -2021,11 +2217,11 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                             disabled={categoriesLoading}
                                         >
                                             <option value="">Select a category...</option>
-                                            {categories.map(cat => (
+                                            {categories && Array.isArray(categories) ? categories.filter(cat => cat && typeof cat === 'object').map(cat => (
                                                 <option key={cat.categoryId || cat.id} value={cat.categoryId || cat.id}>
                                                     {cat.name}
                                                 </option>
-                                            ))}
+                                            )) : []}
                                         </select>
                                         {categoriesLoading && <div className="text-blue-600 text-sm mt-1">Loading categories...</div>}
                                     </div>
@@ -2045,11 +2241,11 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                                             disabled={!selectedCategory || categoriesLoading}
                                         >
                                             <option value="">Select a sub-category...</option>
-                                            {subCategoriesForSelectedCategory.map(sub => (
+                                            {subCategoriesForSelectedCategory && Array.isArray(subCategoriesForSelectedCategory) ? subCategoriesForSelectedCategory.filter(sub => sub && typeof sub === 'object').map(sub => (
                                                 <option key={sub.subCategoryId || sub.id} value={sub.subCategoryId || sub.id}>
                                                     {sub.name}
                                                 </option>
-                                            ))}
+                                            )) : []}
                                         </select>
                                         {selectedSubCategory && (
                                             <p className="text-xs text-gray-500 mt-1">
@@ -2628,47 +2824,13 @@ const AssetSettingsPage = () => {
         assetsList: []
     });
 
-    // Network status state
-    const [networkStatus, setNetworkStatus] = useState({ 
-        isOnline: true, 
-        lastChecked: null, 
-        apiHealth: null 
-    });
+
 
     // Initialize data
     useEffect(() => {
         console.log('Loading asset management data...');
         
-        // Check network and API health
-        const checkNetworkStatus = async () => {
-            try {
-                // Check if browser is online
-                const isOnline = navigator.onLine;
-                setNetworkStatus(prev => ({ ...prev, isOnline }));
-                
-                if (isOnline) {
-                    // Check API health
-                    const apiHealth = await checkAssetApiHealth();
-                    setNetworkStatus(prev => ({ 
-                        ...prev, 
-                        apiHealth,
-                        lastChecked: new Date()
-                    }));
-                    
-                    if (!apiHealth.isHealthy) {
-                        console.warn('API health check failed:', apiHealth.error);
-                        toast.warning('API server appears to be offline. Some features may not work properly.');
-                    }
-                } else {
-                    console.warn('Browser is offline');
-                    toast.warning('You appear to be offline. Please check your internet connection.');
-                }
-            } catch (error) {
-                console.error('Error checking network status:', error);
-            }
-        };
-        
-        checkNetworkStatus();
+
         
         dispatch(fetchAssetCategories());
         dispatch(fetchAssetLocations());
@@ -2682,7 +2844,7 @@ const AssetSettingsPage = () => {
 
     useEffect(() => {
         console.log('Categories updated in component:', categories);
-        console.log('Categories structure:', categories?.map(cat => ({
+        console.log('Categories structure:', categories?.filter(cat => cat && typeof cat === 'object').map(cat => ({
             id: cat.id,
             categoryId: cat.categoryId,
             name: cat.name,
@@ -2693,7 +2855,9 @@ const AssetSettingsPage = () => {
         // Only update editedCategories if categories have actually changed
         if (categories && categories.length > 0) {
             console.log('Updating editedCategories with new categories');
-            setEditedCategories([...categories]);
+            // Filter out any null/undefined values before setting state
+            const validCategories = categories.filter(cat => cat && typeof cat === 'object');
+            setEditedCategories([...validCategories]);
         } else if (!categories || categories.length === 0) {
             console.log('Setting editedCategories to empty array');
             setEditedCategories([]);
@@ -2701,13 +2865,15 @@ const AssetSettingsPage = () => {
     }, [categories]);
 
     useEffect(() => {
-        setEditedLocations(locations || []);
+        // Filter out any null/undefined values before setting state
+        const validLocations = locations ? locations.filter(loc => loc && typeof loc === 'object') : [];
+        setEditedLocations(validLocations);
     }, [locations]);
 
     useEffect(() => {
         console.log('=== STATUSES LOADED FROM REDUX ===');
         console.log('Raw statuses from Redux:', statuses);
-        console.log('Statuses structure:', statuses?.map(s => ({
+        console.log('Statuses structure:', statuses?.filter(s => s && typeof s === 'object').map(s => ({
             id: s.id,
             statusId: s.statusId,
             statusLabelId: s.statusLabelId,
@@ -2716,7 +2882,9 @@ const AssetSettingsPage = () => {
             description: s.description,
             sortOrder: s.sortOrder
         })));
-        setEditedStatuses(statuses || []);
+        // Filter out any null/undefined values before setting state
+        const validStatuses = statuses ? statuses.filter(s => s && typeof s === 'object') : [];
+        setEditedStatuses(validStatuses);
     }, [statuses]);
 
     // Enhanced category management functions
@@ -2775,6 +2943,14 @@ const AssetSettingsPage = () => {
                         toast.error('Cannot update: Invalid category ID');
                         return;
                     }
+                    
+                    // OPTIMISTIC UPDATE: Immediately update the local categories state for instant UI feedback
+                    setEditedCategories(prevCategories => prevCategories.map(cat => {
+                        if (cat.categoryId === category.categoryId) {
+                            return { ...cat, editing: false, name: category.name };
+                        }
+                        return cat;
+                    }));
                     
                     await dispatch(updateAssetCategory({
                         categoryId: category.categoryId,
@@ -2870,11 +3046,14 @@ const AssetSettingsPage = () => {
         console.log('confirmDeleteCategory called with categoryId:', deleteModal.categoryId);
         
         try {
+            // OPTIMISTIC UPDATE: Immediately remove the category from local state for instant UI feedback
+            setEditedCategories(prevCategories => prevCategories.filter(cat => cat.categoryId !== deleteModal.categoryId));
+            
             await dispatch(deleteAssetCategory(deleteModal.categoryId)).unwrap();
             toast.success("Category deleted successfully!");
             
-            // Refresh categories to update the UI
-            dispatch(fetchAssetCategories());
+            // Refresh categories to update the UI (non-blocking)
+            dispatch(fetchAssetCategories()).catch(console.error);
             
         } catch (error) {
             console.error('Error deleting category:', error);
@@ -3032,6 +3211,23 @@ const AssetSettingsPage = () => {
             if (subCategory.subCategoryId) {
                 // Update existing
                 console.log('Updating existing subcategory with actual field values:', { categoryId, subCategoryId, name, prefix, suffix });
+                
+                // OPTIMISTIC UPDATE: Immediately update the local subcategory state for instant UI feedback
+                setEditedCategories(prevCategories => prevCategories.map(cat => {
+                    if (cat.categoryId === categoryId) {
+                        return {
+                            ...cat,
+                            subCategories: cat.subCategories?.map(sub => {
+                                if (sub.subCategoryId === subCategoryId) {
+                                    return { ...sub, editing: false, name, prefix, suffix };
+                                }
+                                return sub;
+                            }) || []
+                        };
+                    }
+                    return cat;
+                }));
+                
                 dispatch(updateSubCategory({
                     categoryId,
                     subCategoryId: subCategory.subCategoryId,
@@ -3052,6 +3248,27 @@ const AssetSettingsPage = () => {
             } else {
                 // Create new
                 console.log('Creating new subcategory with actual field values:', { categoryId, name, prefix, suffix });
+                
+                // OPTIMISTIC UPDATE: Immediately add the new subcategory to local state for instant UI feedback
+                const newSubCategory = {
+                    id: `temp_${Date.now()}`,
+                    subCategoryId: `temp_${Date.now()}`,
+                    name,
+                    prefix,
+                    suffix,
+                    editing: false
+                };
+                
+                setEditedCategories(prevCategories => prevCategories.map(cat => {
+                    if (cat.categoryId === categoryId) {
+                        return {
+                            ...cat,
+                            subCategories: [...(cat.subCategories || []), newSubCategory]
+                        };
+                    }
+                    return cat;
+                }));
+                
                 dispatch(addSubCategory({
                     categoryId,
                     subCategoryData: {
@@ -3191,10 +3408,21 @@ const AssetSettingsPage = () => {
                 const result = await response.json().catch(() => ({}));
                 console.log('Sub-category deletion response:', result);
                 
+                // OPTIMISTIC UPDATE: Immediately remove the subcategory from local state for instant UI feedback
+                setEditedCategories(prevCategories => prevCategories.map(cat => {
+                    if (cat.categoryId === categoryId) {
+                        return {
+                            ...cat,
+                            subCategories: cat.subCategories?.filter(sub => sub.subCategoryId !== subCategoryId) || []
+                        };
+                    }
+                    return cat;
+                }));
+                
                 toast.success("Sub-category deleted successfully!");
                 
-                // Refresh categories to update the UI
-                dispatch(fetchAssetCategories());
+                // Refresh categories to update the UI (non-blocking)
+                dispatch(fetchAssetCategories()).catch(console.error);
                 
             } catch (apiError) {
                 console.error('Direct API call failed, trying Redux action as fallback:', apiError);
@@ -3228,8 +3456,8 @@ const AssetSettingsPage = () => {
                     console.log('Subcategory deleted successfully via Redux:', result);
                     toast.success("Sub-category deleted successfully via Redux!");
                     
-                    // Refresh categories to update the UI
-                    dispatch(fetchAssetCategories());
+                    // Refresh categories to update the UI (non-blocking)
+                    dispatch(fetchAssetCategories()).catch(console.error);
                     
                 } catch (reduxError) {
                     console.error('Redux action also failed:', reduxError);
@@ -3834,8 +4062,8 @@ const AssetSettingsPage = () => {
             setNewLocation({ name: '', address: '', showError: false });
             toast.success("Location added successfully!");
             
-            // Refresh locations from backend to get new data
-            dispatch(fetchAssetLocations());
+            // Refresh locations from backend to get new data (non-blocking)
+            dispatch(fetchAssetLocations()).catch(console.error);
             
         } catch (error) {
             console.error('Error adding location:', error);
@@ -3970,12 +4198,20 @@ const AssetSettingsPage = () => {
                     const result = await response.json();
                     console.log('Location update response:', result);
                     
+                    // OPTIMISTIC UPDATE: Immediately update the local locations state for instant UI feedback
+                    setEditedLocations(prevLocations => prevLocations.map(loc => {
+                        if (loc.id === locationId || loc.locationId === locationId) {
+                            return { ...loc, editing: false, name: locationData.name, address: locationData.address };
+                        }
+                        return loc;
+                    }));
+                    
                     // Clear editing state
                     handleLocationFieldChange(locationId, 'editing', false);
                     toast.success("Location updated successfully!");
                     
-                    // Refresh locations from backend to get updated data
-                    dispatch(fetchAssetLocations());
+                    // Refresh locations from backend to get updated data (non-blocking)
+                    dispatch(fetchAssetLocations()).catch(console.error);
                     
         } catch (error) {
                     console.error('Error updating location:', error);
@@ -4026,6 +4262,11 @@ const AssetSettingsPage = () => {
     
     const confirmDeleteLocation = async () => {
         try {
+            // OPTIMISTIC UPDATE: Immediately remove the location from local state for instant UI feedback
+            setEditedLocations(prevLocations => prevLocations.filter(loc => 
+                loc.id !== deleteLocationModal.locationId && loc.locationId !== deleteLocationModal.locationId
+            ));
+            
             await dispatch(deleteAssetLocation(deleteLocationModal.locationId)).unwrap();
             toast.success("Location deleted successfully!");
         } catch (error) {
@@ -4111,13 +4352,8 @@ const AssetSettingsPage = () => {
             setNewStatus({ name: '', showError: false });
             toast.success("Status label added successfully!");
             
-            // Refresh statuses from backend to get new data
-            dispatch(fetchAssetStatuses());
-            
-            // Also refresh the local state
-            setTimeout(() => {
-                dispatch(fetchAssetStatuses());
-            }, 100);
+            // Refresh statuses from backend to get new data (non-blocking)
+            dispatch(fetchAssetStatuses()).catch(console.error);
             
         } catch (error) {
             console.error('Error adding status label:', error);
@@ -4325,17 +4561,21 @@ const AssetSettingsPage = () => {
                         const result = await response.json();
                         console.log('Status label update response:', result);
                         
+                        // OPTIMISTIC UPDATE: Immediately update the local statuses state for instant UI feedback
+                        setEditedStatuses(prevStatuses => prevStatuses.map(s => {
+                            const sId = s.statusLabelId || s.statusId || s.id;
+                            if (sId === statusId) {
+                                return { ...s, editing: false, name: statusData.name };
+                            }
+                            return s;
+                        }));
+                        
                         // Clear editing state
                         handleStatusFieldChange(statusId, 'editing', false);
                         toast.success("Status label updated successfully!");
                         
-                        // Refresh statuses from backend to get updated data
-                        dispatch(fetchAssetStatuses());
-                        
-                        // Also refresh the local state
-                        setTimeout(() => {
-                            dispatch(fetchAssetStatuses());
-                        }, 100);
+                        // Refresh statuses from backend to get updated data (non-blocking)
+                        dispatch(fetchAssetStatuses()).catch(console.error);
                         
                         return; // Success, exit function
                         
@@ -4367,17 +4607,21 @@ const AssetSettingsPage = () => {
                             
                             console.log('Redux action result:', reduxResult);
                             
+                            // OPTIMISTIC UPDATE: Immediately update the local statuses state for instant UI feedback
+                            setEditedStatuses(prevStatuses => prevStatuses.map(s => {
+                                const sId = s.statusLabelId || s.statusId || s.id;
+                                if (sId === statusId) {
+                                    return { ...s, editing: false, name: statusData.name };
+                                }
+                                return s;
+                            }));
+                            
                             // Clear editing state
                             handleStatusFieldChange(statusId, 'editing', false);
                             toast.success("Status label updated successfully via Redux!");
                             
-                            // Refresh statuses from backend to get updated data
-                            dispatch(fetchAssetStatuses());
-                            
-                            // Also refresh the local state
-                            setTimeout(() => {
-                                dispatch(fetchAssetStatuses());
-                            }, 100);
+                            // Refresh statuses from backend to get updated data (non-blocking)
+                            dispatch(fetchAssetStatuses()).catch(console.error);
                             
                         } catch (reduxError) {
                             console.error('Redux action also failed:', reduxError);
@@ -4466,6 +4710,12 @@ const AssetSettingsPage = () => {
         console.log('Confirming deletion of status label:', deleteStatusModal.statusId);
         
         try {
+            // OPTIMISTIC UPDATE: Immediately remove the status from local state for instant UI feedback
+            setEditedStatuses(prevStatuses => prevStatuses.filter(s => {
+                const sId = s.statusLabelId || s.statusId || s.id;
+                return sId !== deleteStatusModal.statusId;
+            }));
+            
             await dispatch(deleteAssetStatus(deleteStatusModal.statusId)).unwrap();
             toast.success("Status label deleted successfully!");
         } catch (error) {
@@ -4500,9 +4750,23 @@ const AssetSettingsPage = () => {
 
     // Custom Form management functions
     const handleDeleteForm = (formId) => {
+        // Validate formId before proceeding
+        if (!formId || formId === 'undefined' || formId === undefined) {
+            console.error('Invalid form ID for deletion:', formId);
+            toast.error('Cannot delete: Invalid form ID');
+            return;
+        }
+        
         // Show custom confirmation modal instead of browser confirm
         // Use the helper function to find the form by ID
-        const form = forms.find(f => getFormId(f) === formId);
+        const form = forms && Array.isArray(forms) ? forms.find(f => f && getFormId(f) === formId) : null;
+        
+        if (!form) {
+            console.error('Form not found for deletion:', formId);
+            toast.error('Form not found. Please refresh the page and try again.');
+            return;
+        }
+        
         setDeleteFormModal({ 
             open: true, 
             formId, 
@@ -4513,6 +4777,9 @@ const AssetSettingsPage = () => {
     const confirmDeleteForm = async () => {
         const { formId } = deleteFormModal;
         try {
+            // OPTIMISTIC UPDATE: Immediately remove the form from local state for instant UI feedback
+            // Note: This will be handled by the Redux state update, but we can also update local state if needed
+            
             await dispatch(deleteCustomForm(formId)).unwrap();
             toast.success("Form deleted successfully!");
             setDeleteFormModal({ open: false, formId: null, formName: '' });
@@ -4756,54 +5023,7 @@ const AssetSettingsPage = () => {
                             <p className="text-gray-500 mt-1">Configure and standardize your company&apos;s asset tracking system.</p>
                         </div>
                         
-                        {/* Network Status Indicator */}
-                        <div className="flex items-center gap-3">
-                            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                                networkStatus.isOnline && networkStatus.apiHealth?.isHealthy
-                                    ? 'bg-green-100 text-green-700'
-                                    : networkStatus.isOnline
-                                    ? 'bg-yellow-100 text-yellow-700'
-                                    : 'bg-red-100 text-red-700'
-                            }`}>
-                                <div className={`w-2 h-2 rounded-full ${
-                                    networkStatus.isOnline && networkStatus.apiHealth?.isHealthy
-                                        ? 'bg-green-500'
-                                        : networkStatus.isOnline
-                                        ? 'bg-yellow-500'
-                                        : 'bg-red-500'
-                                }`}></div>
-                                <span>
-                                    {networkStatus.isOnline && networkStatus.apiHealth?.isHealthy
-                                        ? 'Online'
-                                        : networkStatus.isOnline
-                                        ? 'API Offline'
-                                        : 'Offline'
-                                    }
-                                </span>
-                            </div>
-                            
-                            {networkStatus.lastChecked && (
-                                <button
-                                    onClick={async () => {
-                                        const apiHealth = await checkAssetApiHealth();
-                                        setNetworkStatus(prev => ({ 
-                                            ...prev, 
-                                            apiHealth,
-                                            lastChecked: new Date()
-                                        }));
-                                        if (apiHealth.isHealthy) {
-                                            toast.success('API connection restored!');
-                                        } else {
-                                            toast.error('API still offline');
-                                        }
-                                    }}
-                                    className="text-blue-600 hover:text-blue-800 text-sm"
-                                    title="Check API Status"
-                                >
-                                    🔄
-                                </button>
-                            )}
-                        </div>
+
                     </div>
                 </header>
                 

@@ -395,6 +395,24 @@ export const updateCustomForm = createAsyncThunk(
         throw new Error('Company ID not found');
       }
       
+      // Validate formData parameter
+      if (!formData || typeof formData !== 'object') {
+        throw new Error('Invalid formData provided. Expected an object with form properties.');
+      }
+      
+      // Validate required fields
+      if (!formData.name) {
+        throw new Error('Form name is required');
+      }
+      
+      if (!formData.categoryId) {
+        throw new Error('Category ID is required');
+      }
+      
+      if (!Array.isArray(formData.fields)) {
+        throw new Error('Form fields must be an array');
+      }
+      
       // Transform the form data to match the backend CustomFormDTO structure
       const customFormDTO = {
         name: formData.name,
@@ -541,16 +559,19 @@ const customFormsSlice = createSlice({
     forms: [],
     currentForm: null,
     loading: false,
-    creating: false,
-    updating: false,
-    deleting: false,
+    creatingForm: false,
+    updatingForm: false,
+    deletingForm: false,
     error: null,
     formsByCategory: {}, // New state for forms by category
     fieldsByForm: {} // New state for fields by form
   },
   reducers: {
     setCurrentForm: (state, action) => {
-      state.currentForm = action.payload;
+      // Safely set current form, ensuring payload exists
+      if (action.payload) {
+        state.currentForm = action.payload;
+      }
     },
     clearCurrentForm: (state) => {
       state.currentForm = null;
@@ -568,11 +589,16 @@ const customFormsSlice = createSlice({
       })
       .addCase(fetchCustomForms.fulfilled, (state, action) => {
         state.loading = false;
-        state.forms = action.payload;
+        // Safely check if payload exists and is an array
+        if (action.payload && Array.isArray(action.payload)) {
+          state.forms = action.payload;
+        } else {
+          state.forms = [];
+        }
       })
       .addCase(fetchCustomForms.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
+        state.error = action.payload || 'Failed to fetch custom forms';
       })
       
       // Fetch forms by category
@@ -582,16 +608,20 @@ const customFormsSlice = createSlice({
       })
       .addCase(fetchCustomFormsByCategory.fulfilled, (state, action) => {
         state.loading = false;
-        const { categoryId, forms } = action.payload;
-        // Store forms by category for easy access
-        if (!state.formsByCategory) {
-          state.formsByCategory = {};
+        // Safely extract categoryId and forms from payload
+        const { categoryId, forms } = action.payload || {};
+        
+        if (categoryId && forms) {
+          // Store forms by category for easy access
+          if (!state.formsByCategory) {
+            state.formsByCategory = {};
+          }
+          state.formsByCategory[categoryId] = forms;
         }
-        state.formsByCategory[categoryId] = forms;
       })
       .addCase(fetchCustomFormsByCategory.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
+        state.error = action.payload || 'Failed to fetch custom forms by category';
       })
       
       // Create custom form
@@ -601,13 +631,14 @@ const customFormsSlice = createSlice({
       })
       .addCase(createCustomForm.fulfilled, (state, action) => {
         state.creatingForm = false;
-        if (action.payload) {
+        // Safely check if payload exists and has required properties
+        if (action.payload && action.payload.id) {
           state.forms.push(action.payload);
         }
       })
       .addCase(createCustomForm.rejected, (state, action) => {
         state.creatingForm = false;
-        state.error = action.payload;
+        state.error = action.payload || 'Failed to create custom form';
       })
       
       // Update custom form
@@ -617,17 +648,23 @@ const customFormsSlice = createSlice({
       })
       .addCase(updateCustomForm.fulfilled, (state, action) => {
         state.updatingForm = false;
-        const index = state.forms.findIndex(form => form.id === action.payload.formId);
-        if (index !== -1) {
-          state.forms[index] = action.payload.form;
-        }
-        if (state.currentForm && state.currentForm.id === action.payload.formId) {
-          state.currentForm = action.payload.form;
+        // The action payload contains the updated form data directly
+        const updatedForm = action.payload;
+        const formId = updatedForm.formId || updatedForm.id;
+        
+        if (formId) {
+          const index = state.forms.findIndex(form => form.id === formId);
+          if (index !== -1) {
+            state.forms[index] = updatedForm;
+          }
+          if (state.currentForm && state.currentForm.id === formId) {
+            state.currentForm = updatedForm;
+          }
         }
       })
       .addCase(updateCustomForm.rejected, (state, action) => {
         state.updatingForm = false;
-        state.error = action.payload;
+        state.error = action.payload || 'Failed to update custom form';
       })
       
       // Delete custom form
@@ -637,14 +674,19 @@ const customFormsSlice = createSlice({
       })
       .addCase(deleteCustomForm.fulfilled, (state, action) => {
         state.deletingForm = false;
-        state.forms = state.forms.filter(form => form.id !== action.payload);
-        if (state.currentForm && state.currentForm.id === action.payload) {
-          state.currentForm = null;
+        // Safely extract the formId to delete
+        const formIdToDelete = action.payload;
+        
+        if (formIdToDelete) {
+          state.forms = state.forms.filter(form => form.id !== formIdToDelete);
+          if (state.currentForm && state.currentForm.id === formIdToDelete) {
+            state.currentForm = null;
+          }
         }
       })
       .addCase(deleteCustomForm.rejected, (state, action) => {
         state.deletingForm = false;
-        state.error = action.payload;
+        state.error = action.payload || 'Failed to delete custom form';
       })
       
       // Fetch form fields
@@ -654,32 +696,46 @@ const customFormsSlice = createSlice({
       })
       .addCase(fetchFormFields.fulfilled, (state, action) => {
         state.loading = false;
-        const { formId, fields } = action.payload;
-        // Store fields by form for easy access
-        if (!state.fieldsByForm) {
-          state.fieldsByForm = {};
+        // Safely extract formId and fields from payload
+        const { formId, fields } = action.payload || {};
+        
+        if (formId && fields) {
+          // Store fields by form for easy access
+          if (!state.fieldsByForm) {
+            state.fieldsByForm = {};
+          }
+          state.fieldsByForm[formId] = fields;
         }
-        state.fieldsByForm[formId] = fields;
       })
       .addCase(fetchFormFields.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
+        state.error = action.payload || 'Failed to fetch form fields';
       })
       
 
       
       // Toggle status
       .addCase(toggleFormStatus.fulfilled, (state, action) => {
-        const index = state.forms.findIndex(form => form.id === action.payload.id);
-        if (index !== -1) {
-          state.forms[index].enabled = action.payload.enabled;
+        // Safely extract id and enabled from payload
+        const { id, enabled } = action.payload || {};
+        
+        if (id && enabled !== undefined) {
+          const index = state.forms.findIndex(form => form.id === id);
+          if (index !== -1) {
+            state.forms[index].enabled = enabled;
+          }
         }
       })
       // Assign sub-category
       .addCase(assignFormToSubCategory.fulfilled, (state, action) => {
-        const index = state.forms.findIndex(form => form.id === action.payload.id);
-        if (index !== -1) {
-          state.forms[index].subCategoryId = action.payload.subCategoryId;
+        // Safely extract id and subCategoryId from payload
+        const { id, subCategoryId } = action.payload || {};
+        
+        if (id && subCategoryId !== undefined) {
+          const index = state.forms.findIndex(form => form.id === id);
+          if (index !== -1) {
+            state.forms[index].subCategoryId = subCategoryId;
+          }
         }
       });
   }
