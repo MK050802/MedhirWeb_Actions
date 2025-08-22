@@ -43,6 +43,7 @@ import customerReducer from './slices/customerSlice';
 import accountSettingsReducer from './slices/accountSettingsSlice'; // Import account settings slice
 import employeeAdvanceReducer from './slices/employeeAdvanceSlice';
 import arrearsReducer from './slices/arrearsSlice';
+import payrollFreezeStatusReducer from './slices/payrollFreezeStatusSlice';
 
 export const store = configureStore({
   reducer: {
@@ -91,6 +92,7 @@ export const store = configureStore({
     accountSettings: accountSettingsReducer,
     employeeAdvance: employeeAdvanceReducer,
     arrears: arrearsReducer,
+    payrollFreezeStatus: payrollFreezeStatusReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

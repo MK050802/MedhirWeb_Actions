@@ -86,6 +86,9 @@ export const fetchPayStructureSettings = createAsyncThunk(
           employerPfPercentage: response.data.employerPfPercentage,
           employeePfPercentage: response.data.employeePfPercentage,
           pfCap: response.data.pfCap,
+          professionalTaxThreshold: response.data.professionalTaxThreshold || 0,
+          professionalTaxAmountAboveThreshold: response.data.professionalTaxAmountAboveThreshold || 0,
+          professionalTaxAmountBelowThreshold: response.data.professionalTaxAmountBelowThreshold || 0,
           description: response.data.description || "",
         };
       }
@@ -299,6 +302,9 @@ export const savePayStructureSettings = createAsyncThunk(
         employerPfPercentage: parseFloat(payStructureData.employerPfPercentage),
         employeePfPercentage: parseFloat(payStructureData.employeePfPercentage),
         pfCap: parseFloat(payStructureData.pfCap),
+        professionalTaxThreshold: parseFloat(payStructureData.professionalTaxThreshold),
+        professionalTaxAmountAboveThreshold: parseFloat(payStructureData.professionalTaxAmountAboveThreshold),
+        professionalTaxAmountBelowThreshold: parseFloat(payStructureData.professionalTaxAmountBelowThreshold),
         description: payStructureData.description || "",
       };
 
@@ -355,6 +361,11 @@ export const fetchPayrollSettings = createAsyncThunk(
                     "Content-Type": "application/json"
                 }
             });
+
+            if (response.status === 404) {
+                // Handle 404 gracefully - return null instead of throwing error
+                return null;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);

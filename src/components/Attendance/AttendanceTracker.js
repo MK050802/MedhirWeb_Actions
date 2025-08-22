@@ -20,7 +20,6 @@ import {
   clearError,
   clearSuccess,
 } from "@/redux/slices/manualAttendanceSlice";
-import { fetchPayrollSettings } from "@/redux/slices/payrollSettingsSlice";
 import { toast } from "sonner";
 import AttendanceTable from "./AttendanceTable";
 import LeaveTable from "./LeaveTable";
@@ -48,8 +47,40 @@ function AttendanceTracker({
   initialSelectedMonth = null,
   initialSelectedYear = null,
   initialSelectedStatuses = [],
+  isPayrollFrozen = false,
 }) {
   const dispatch = useDispatch();
+
+  // Helper function to convert month name to month number
+  const getMonthNumber = (monthName) => {
+    const monthMap = {
+      January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
+      July: 7, August: 8, September: 9, October: 10, November: 11, December: 12
+    };
+    return monthMap[monthName] || 1;
+  };
+
+  // Constants for month mappings
+  const MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const SHORT_MONTH_NAMES = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  ];
+
+  const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  // Constants for year range
+  const MIN_YEAR = 2024;
+  const getCurrentYear = () => new Date().getFullYear();
+
+  // Constants for attendance statuses
+  const EDITABLE_STATUSES = ["P", "A", "P/A", null, undefined, ""];
+  const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+  const MAX_FUTURE_YEARS = 10;
 
   const { attendance, attendanceHistory, historyLoading, historyError, loading, err } = useSelector(
     (state) => state.attendances
@@ -62,7 +93,7 @@ function AttendanceTracker({
     message: manualAttendanceMessage,
   } = useSelector((state) => state.manualAttendance);
 
-  const { settings: payrollSettings } = useSelector((state) => state.payrollSettings);
+  // Payroll freeze status is now passed as a prop from the parent component
 
   // State variables
   const [searchInput, setSearchInput] = useState("");
@@ -503,7 +534,6 @@ function AttendanceTracker({
 
   // Always keep monthYear in sync with main selectedMonth/selectedYear
   useEffect(() => {
-    console.log('Main month/year changed:', { selectedMonth, selectedYear });
     setMonthYear({
       month: selectedMonth,
       year: selectedYear
@@ -513,7 +543,6 @@ function AttendanceTracker({
   // Synchronize monthYear state with main selectedMonth/selectedYear when single employee modal opens
   useEffect(() => {
     if (isSingleEmployeeModalOpen) {
-      console.log('Syncing monthYear for modal:', { selectedMonth, selectedYear });
       setMonthYear({
         month: selectedMonth,
         year: selectedYear
@@ -594,12 +623,6 @@ function AttendanceTracker({
       isFetchingEmployeeDataRef.current = true;
 
       // Fetch existing attendance data for this employee and month/year
-      console.log('Making API call with:', {
-        employeeId: selectedEmployeeForMonth.id,
-        month: monthYear.month,
-        year: monthYear.year,
-        monthYear
-      });
       dispatch(
         fetchOneEmployeeAttendanceOneMonth({
           employeeId: selectedEmployeeForMonth.id,
@@ -710,7 +733,7 @@ function AttendanceTracker({
         })
         .catch((error) => {
           isFetchingEmployeeDataRef.current = false;
-          console.error("Error fetching employee attendance:", error);
+
           // Initialize with empty values on error
           const dates = generateMonthDates(monthYear.month, monthYear.year);
           const initialData = {};
@@ -736,15 +759,6 @@ function AttendanceTracker({
       const selectedDate = new Date(selectedDateForAll);
       const month = selectedDate.getMonth() + 1; // getMonth() returns 0-11
       const year = selectedDate.getFullYear();
-
-      console.log(
-        "Fetching attendance data for:",
-        selectedDateForAll,
-        "Month:",
-        month,
-        "Year:",
-        year
-      );
 
       // Fetch attendance data for the selected month/year
       dispatch(
@@ -1121,13 +1135,6 @@ function AttendanceTracker({
       const selectedDate = new Date(selectedDateForAll);
       const selectedDay = selectedDate.getDate();
 
-      console.log(
-        "Populating attendance data for day:",
-        selectedDay,
-        "Date:",
-        selectedDateForAll
-      );
-
       const initialData = {};
       filteredEmployees.forEach((employee) => {
         // Check if we have attendance data for this employee and date
@@ -1197,6 +1204,12 @@ function AttendanceTracker({
   };
 
   const setAllDaysStatus = (status) => {
+    // Check if payroll is frozen for current month
+    if (isPayrollFrozen(getMonthNumber(monthYear.month), parseInt(monthYear.year))) {
+      toast.error("Cannot edit attendance. Payroll is frozen.");
+      return;
+    }
+    
     const dates = generateMonthDates(monthYear.month, monthYear.year);
     const newData = {};
     dates.forEach(({ day }) => {
@@ -1206,6 +1219,12 @@ function AttendanceTracker({
   };
 
   const setDayStatus = (day, status) => {
+    // Check if payroll is frozen for current month
+    if (isPayrollFrozen(getMonthNumber(monthYear.month), parseInt(monthYear.year))) {
+      toast.error("Cannot edit attendance. Payroll is frozen.");
+      return;
+    }
+    
     // Check if this date is outside the editable range
     const dateString = `${monthYear.year}-${String(new Date(`${monthYear.month} 1, ${monthYear.year}`).getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     
@@ -1221,6 +1240,12 @@ function AttendanceTracker({
   };
 
   const handleSaveMonthAttendance = () => {
+    // Check if payroll is frozen for current month
+    if (isPayrollFrozen(getMonthNumber(monthYear.month), parseInt(monthYear.year))) {
+      toast.error("Cannot mark attendance. Payroll is frozen.");
+      return;
+    }
+    
     if (!selectedEmployeeForMonth) {
       toast.error("Please select an employee");
       return;
@@ -1305,6 +1330,12 @@ function AttendanceTracker({
   };
 
   const setAllEmployeesStatus = (status) => {
+    // Check if payroll is frozen for current month
+    if (isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear))) {
+      toast.error("Cannot edit attendance. Payroll is frozen.");
+      return;
+    }
+    
     const newData = {};
     filteredEmployees.forEach((employee) => {
       newData[employee.id] = status;
@@ -1313,6 +1344,12 @@ function AttendanceTracker({
   };
 
   const setEmployeeStatus = (employeeId, status) => {
+    // Check if payroll is frozen for current month
+    if (isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear))) {
+      toast.error("Cannot edit attendance. Payroll is frozen.");
+      return;
+    }
+    
     // Check if the selected date is outside the editable range
     if (selectedDateForAll && !isDateEditable(selectedDateForAll)) {
       toast.error("Cannot edit attendance for dates outside the editable range");
@@ -1326,6 +1363,12 @@ function AttendanceTracker({
   };
 
   const handleSaveAllEmployeesAttendance = () => {
+    // Check if payroll is frozen for current month
+    if (isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear))) {
+      toast.error("Cannot mark attendance. Payroll is frozen.");
+      return;
+    }
+    
     // Default to today's date if no date is selected
     let dateToUse = selectedDateForAll;
     if (!dateToUse) {
@@ -1577,13 +1620,11 @@ function AttendanceTracker({
   const handleCellClick = (employee, date, status, event) => {
     // Edge case: Check if employee and date are valid
     if (!employee || !employee.id || !date) {
-      console.warn("Invalid employee or date data");
       return;
     }
 
     // Edge case: Check if event target exists
     if (!event || !event.target) {
-      console.warn("Invalid event target");
       return;
     }
 
@@ -1674,9 +1715,14 @@ function AttendanceTracker({
     cellPopoverAnchorRef.current = event.target;
   };
 
-  // Check if a date is editable based on payroll settings and month restrictions
+  // Check if a date is editable based on payroll freeze status
   const isDateEditable = (dateString) => {
     if (!dateString) return false;
+    
+    // If payroll is frozen for current month, no dates are editable
+    if (isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear))) {
+      return false;
+    }
     
     const targetDate = new Date(dateString);
     const currentDate = new Date();
@@ -1684,42 +1730,18 @@ function AttendanceTracker({
     // Get current month and year
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth(); // 0-11
-    const currentDay = currentDate.getDate();
     
     // Get target month and year
     const targetYear = targetDate.getFullYear();
     const targetMonth = targetDate.getMonth(); // 0-11
-    const targetDay = targetDate.getDate();
     
-    // If payroll settings are available, use them for freeze logic
-    if (payrollSettings && payrollSettings.payrollEnablementDate && payrollSettings.freezeAfterDays) {
-      const payrollEnablementDate = payrollSettings.payrollEnablementDate;
-      const freezeAfterDays = payrollSettings.freezeAfterDays;
-      
-      // Check if current date is past the freeze date for current month
-      const isCurrentMonthFrozen = currentDay > payrollEnablementDate + freezeAfterDays;
-      
-      if (targetYear === currentYear) {
-        if (targetMonth === currentMonth) {
-          // Current month: always editable
-          return true;
-        } else if (targetMonth === currentMonth - 1) {
-          // Previous month: check if it's frozen
-          return !isCurrentMonthFrozen;
-        }
-      } else if (targetYear === currentYear - 1) {
-        // Previous year: only allow if it's December and current month is January
-        return targetMonth === 11 && currentMonth === 0 && !isCurrentMonthFrozen;
-      }
-    } else {
-      // Fallback to original logic if payroll settings not available
-      if (targetYear === currentYear) {
-        // Same year: allow current month and previous month
-        return targetMonth >= currentMonth - 1;
-      } else if (targetYear === currentYear - 1) {
-        // Previous year: only allow if it's December (previous month)
-        return targetMonth === 11 && currentMonth === 0;
-      }
+    // When not frozen, allow current month and previous month
+    if (targetYear === currentYear) {
+      // Same year: allow current month and previous month
+      return targetMonth >= currentMonth - 1;
+    } else if (targetYear === currentYear - 1) {
+      // Previous year: only allow if it's December (previous month)
+      return targetMonth === 11 && currentMonth === 0;
     }
     
     return false;
@@ -1727,44 +1749,26 @@ function AttendanceTracker({
 
   // Check if the current month is editable (for button disabling)
   const isCurrentMonthEditable = () => {
+    // If payroll is frozen for current month, no months are editable
+    if (isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear))) {
+      return false;
+    }
+    
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth(); // 0-11
-    const currentDay = currentDate.getDate();
     
     // Get selected month and year
     const selectedMonthIndex = new Date(`${selectedMonth} 1, ${selectedYear}`).getMonth();
     const selectedYearNum = parseInt(selectedYear);
     
-    // If payroll settings are available, use them for freeze logic
-    if (payrollSettings && payrollSettings.payrollEnablementDate && payrollSettings.freezeAfterDays) {
-      const payrollEnablementDate = payrollSettings.payrollEnablementDate;
-      const freezeAfterDays = payrollSettings.freezeAfterDays;
-      
-      // Check if current date is past the freeze date for current month
-      const isCurrentMonthFrozen = currentDay > payrollEnablementDate + freezeAfterDays;
-      
-      if (selectedYearNum === currentYear) {
-        if (selectedMonthIndex === currentMonth) {
-          // Current month: always editable
-          return true;
-        } else if (selectedMonthIndex === currentMonth - 1) {
-          // Previous month: check if it's frozen
-          return !isCurrentMonthFrozen;
-        }
-      } else if (selectedYearNum === currentYear - 1) {
-        // Previous year: only allow if it's December and current month is January
-        return selectedMonthIndex === 11 && currentMonth === 0 && !isCurrentMonthFrozen;
-      }
-    } else {
-      // Fallback to original logic if payroll settings not available
-      if (selectedYearNum === currentYear) {
-        // Same year: allow current month and previous month
-        return selectedMonthIndex >= currentMonth - 1;
-      } else if (selectedYearNum === currentYear - 1) {
-        // Previous year: only allow if it's December (previous month)
-        return selectedMonthIndex === 11 && currentMonth === 0;
-      }
+    // When not frozen, allow current month and previous month
+    if (selectedYearNum === currentYear) {
+      // Same year: allow current month and previous month
+      return selectedMonthIndex >= currentMonth - 1;
+    } else if (selectedYearNum === currentYear - 1) {
+      // Previous year: only allow if it's December (previous month)
+      return selectedMonthIndex === 11 && currentMonth === 0;
     }
     
     return false;
@@ -1772,8 +1776,7 @@ function AttendanceTracker({
 
   // Check if the current cell is editable
   const isCurrentCellEditable = () => {
-    const editableStatuses = ["P", "A", "P/A", null, undefined, ""];
-    const statusEditable = editableStatuses.includes(cellPopoverStatus);
+    const statusEditable = EDITABLE_STATUSES.includes(cellPopoverStatus);
     
     // Also check if the date is within editable range
     return statusEditable && isDateEditable(cellPopoverDate);
@@ -1814,14 +1817,11 @@ function AttendanceTracker({
   const handleViewHistory = () => {
     // Edge case: Check if required data exists
     if (!cellPopoverEmployee || !cellPopoverEmployee.id || !cellPopoverDate) {
-      console.warn("Missing required data for view history");
       return;
     }
     
     // Edge case: Validate date format (YYYY-MM-DD)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(cellPopoverDate)) {
-      console.warn("Invalid date format for view history");
+    if (!DATE_REGEX.test(cellPopoverDate)) {
       return;
     }
     
@@ -1834,12 +1834,11 @@ function AttendanceTracker({
     const dayNum = parseInt(day);
     
     if (isNaN(yearNum) || isNaN(monthNum) || isNaN(dayNum)) {
-      console.warn("Invalid date components for view history");
       return;
     }
     
-    if (yearNum < 1900 || yearNum > 2100 || monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) {
-      console.warn("Date out of valid range for view history");
+    const currentYear = getCurrentYear();
+    if (yearNum < MIN_YEAR || yearNum > currentYear + MAX_FUTURE_YEARS || monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) {
       return;
     }
     
@@ -1855,6 +1854,12 @@ function AttendanceTracker({
 
   // Handler to save status change
   const handleCellPopoverSave = () => {
+    // Check if payroll is frozen for current month
+    if (isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear))) {
+      toast.error("Cannot mark attendance. Payroll is frozen.");
+      return;
+    }
+    
     if (!cellPopoverEmployee || !cellPopoverDate) return;
     const employeeId = cellPopoverEmployee.id;
     const date = cellPopoverDate;
@@ -1903,6 +1908,8 @@ function AttendanceTracker({
 
 
 
+
+
       {/* Combined Controls Row: action buttons + tabs in one line */}
       {!isSingleEmployeeModalOpen && !isAllEmployeesDateModalOpen && (
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -1911,18 +1918,20 @@ function AttendanceTracker({
             <div className="relative" ref={employeeDropdownRef}>
               <button
                 className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 ${
-                  isCurrentMonthEditable()
-                    ? "bg-blue-500 text-white hover:bg-blue-600"
-                    : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                  isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear)) || !isCurrentMonthEditable()
+                    ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                    : "bg-blue-500 text-white hover:bg-blue-600"
                 }`}
                 onClick={(e) => {
-                  if (!isCurrentMonthEditable()) return;
+                  if (isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear)) || !isCurrentMonthEditable()) return;
                   e.stopPropagation();
                   setIsEmployeeDropdownOpen(!isEmployeeDropdownOpen);
                 }}
-                disabled={!isCurrentMonthEditable()}
+                disabled={isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear)) || !isCurrentMonthEditable()}
                 title={
-                  !isCurrentMonthEditable()
+                  isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear))
+                    ? "Payroll is frozen"
+                    : !isCurrentMonthEditable()
                     ? "Cannot edit attendance for this month - outside editable range"
                     : "Edit attendance for a single employee"
                 }
@@ -2018,23 +2027,25 @@ function AttendanceTracker({
             </div>
             <button
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 ${
-                isCurrentMonthEditable()
-                  ? "bg-blue-500 text-white hover:bg-blue-600"
-                  : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear)) || !isCurrentMonthEditable()
+                  ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
               }`}
               onClick={() => {
-                if (!isCurrentMonthEditable()) return;
+                if (isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear)) || !isCurrentMonthEditable()) return;
                 switchToAllEmployeesTab();
               }}
-              disabled={!isCurrentMonthEditable()}
+              disabled={isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear)) || !isCurrentMonthEditable()}
               title={
-                !isCurrentMonthEditable()
+                isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear))
+                  ? "Payroll is frozen"
+                  : !isCurrentMonthEditable()
                   ? "Cannot edit attendance for this month - outside editable range"
                   : "Edit attendance for all employees on a specific date"
               }
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-6 0 2 2 0 016 0z" />
               </svg>
               <span>All Employees Date</span>
             </button>
@@ -2188,12 +2199,12 @@ function AttendanceTracker({
                             className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
                           >
                             {(() => {
-                              const currentYear = new Date().getFullYear();
+                              const currentYear = getCurrentYear();
                               const years = [];
                               // Only show current year and past years
                               for (
                                 let year = currentYear;
-                                year >= 2024;
+                                year >= MIN_YEAR;
                                 year--
                               ) {
                                 years.push(year);
@@ -2209,35 +2220,8 @@ function AttendanceTracker({
 
                         {/* Month Grid */}
                         <div className="grid grid-cols-3 gap-1">
-                          {[
-                            "Jan",
-                            "Feb",
-                            "Mar",
-                            "Apr",
-                            "May",
-                            "Jun",
-                            "Jul",
-                            "Aug",
-                            "Sep",
-                            "Oct",
-                            "Nov",
-                            "Dec",
-                          ].map((month, index) => {
-                            const monthNames = [
-                              "January",
-                              "February",
-                              "March",
-                              "April",
-                              "May",
-                              "June",
-                              "July",
-                              "August",
-                              "September",
-                              "October",
-                              "November",
-                              "December",
-                            ];
-                            const fullMonthName = monthNames[index];
+                          {SHORT_MONTH_NAMES.map((month, index) => {
+                            const fullMonthName = MONTH_NAMES[index];
                             const isSelected =
                               monthYear.month === fullMonthName;
 
@@ -2247,37 +2231,30 @@ function AttendanceTracker({
                             const currentMonth = currentDate.getMonth();
                             const currentDay = currentDate.getDate();
                             
-                            // Check if payroll settings are available for freeze logic
+                            // Check if payroll is frozen for month selection
                             let isEditableMonth = true;
-                            if (payrollSettings && payrollSettings.payrollEnablementDate && payrollSettings.freezeAfterDays) {
-                              const payrollEnablementDate = payrollSettings.payrollEnablementDate;
-                              const freezeAfterDays = payrollSettings.freezeAfterDays;
-                              const isCurrentMonthFrozen = currentDay > payrollEnablementDate + freezeAfterDays;
-                              
+                            if (isPayrollFrozen(monthYear.month, monthYear.year)) {
+                              // If payroll is frozen for this month, no months are editable
+                              isEditableMonth = false;
+                            } else {
+                              // When not frozen, use month range logic
                               if (parseInt(monthYear.year) === currentYear) {
                                 if (index === currentMonth) {
                                   // Current month: always editable
                                   isEditableMonth = true;
                                 } else if (index === currentMonth - 1) {
-                                  // Previous month: check if it's frozen
-                                  isEditableMonth = !isCurrentMonthFrozen;
+                                  // Previous month: editable when not frozen
+                                  isEditableMonth = true;
                                 } else {
                                   // Other months: not editable
                                   isEditableMonth = false;
                                 }
                               } else if (parseInt(monthYear.year) === currentYear - 1) {
                                 // Previous year: only allow if it's December and current month is January
-                                isEditableMonth = index === 11 && currentMonth === 0 && !isCurrentMonthFrozen;
+                                isEditableMonth = index === 11 && currentMonth === 0;
                               } else {
                                 isEditableMonth = false;
                               }
-                            } else {
-                              // Fallback to original logic if payroll settings not available
-                              const isFutureMonth =
-                                parseInt(monthYear.year) > currentYear ||
-                                (parseInt(monthYear.year) === currentYear &&
-                                  index > currentMonth);
-                              isEditableMonth = !isFutureMonth;
                             }
 
                             return (
@@ -2368,10 +2345,6 @@ function AttendanceTracker({
                           value={singleEmployeeMarkAsStatus}
                           onValueChange={(value) => {
                             setSingleEmployeeMarkAsStatus(value);
-                            console.log(
-                              "Single Employee Mark As Status changed to:",
-                              value
-                            );
                           }}
                         >
                           {dropdownStatusOptions.map((opt) => (
@@ -2381,10 +2354,6 @@ function AttendanceTracker({
                               className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                console.log(
-                                  "Single Employee Mark As dropdown item clicked:",
-                                  opt.value
-                                );
                                 setSingleEmployeeMarkAsStatus(opt.value);
                               }}
                             >
@@ -2477,7 +2446,7 @@ function AttendanceTracker({
                         );
                         let daysToApply = [];
                         // Only apply filters to editable statuses: Present, Absent, Half Day, and empty cells
-                        const editableStatuses = ["P", "A", "P/A", null, undefined, ""];
+                        const editableStatuses = EDITABLE_STATUSES;
                         
                         if (scope === "all") {
                           daysToApply = dates
@@ -2516,29 +2485,23 @@ function AttendanceTracker({
 
                           // Create mapping from full day names to abbreviated day names
                           const dayNameMapping = {
-                            Monday: "Mon",
-                            Tuesday: "Tue",
-                            Wednesday: "Wed",
-                            Thursday: "Thu",
-                            Friday: "Fri",
-                            Saturday: "Sat",
-                            Sunday: "Sun",
+                            Monday: WEEKDAY_NAMES[1],
+                            Tuesday: WEEKDAY_NAMES[2],
+                            Wednesday: WEEKDAY_NAMES[3],
+                            Thursday: WEEKDAY_NAMES[4],
+                            Friday: WEEKDAY_NAMES[5],
+                            Saturday: WEEKDAY_NAMES[6],
+                            Sunday: WEEKDAY_NAMES[0],
                           };
 
                           daysToApply = dates
                             .filter((d) => {
                               const currentStatus = monthAttendanceData[d.day];
                               // Check if this day is not a weekly off day for this employee
-                              const isWeeklyOffDay = employeeWeeklyOffDays.some(
+                                                                const isWeeklyOffDay = employeeWeeklyOffDays.some(
                                 (offDay) => {
                                   const mappedDay = dayNameMapping[offDay];
-                                  const matches = mappedDay === d.weekday;
-                                  if (matches) {
-                                    console.log(
-                                      `Day ${d.day} (${d.weekday}) is a weekly off day (${offDay})`
-                                    );
-                                  }
-                                  return matches;
+                                  return mappedDay === d.weekday;
                                 }
                               );
                               return (
@@ -2567,13 +2530,13 @@ function AttendanceTracker({
 
                           // Create mapping from full day names to abbreviated day names
                           const dayNameMapping = {
-                            Monday: "Mon",
-                            Tuesday: "Tue",
-                            Wednesday: "Wed",
-                            Thursday: "Thu",
-                            Friday: "Fri",
-                            Saturday: "Sat",
-                            Sunday: "Sun",
+                            Monday: WEEKDAY_NAMES[1],
+                            Tuesday: WEEKDAY_NAMES[2],
+                            Wednesday: WEEKDAY_NAMES[3],
+                            Thursday: WEEKDAY_NAMES[4],
+                            Friday: WEEKDAY_NAMES[5],
+                            Saturday: WEEKDAY_NAMES[6],
+                            Sunday: WEEKDAY_NAMES[0],
                           };
 
                           daysToApply = dates
@@ -2685,7 +2648,7 @@ function AttendanceTracker({
                 </h4>
                 <div className="grid grid-cols-7 gap-2">
                   {/* Day Headers */}
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                  {WEEKDAY_NAMES.map(
                     (day) => (
                       <div
                         key={day}
@@ -2732,13 +2695,13 @@ function AttendanceTracker({
 
                         // Create mapping from full day names to abbreviated day names
                         const dayNameMapping = {
-                          Monday: "Mon",
-                          Tuesday: "Tue",
-                          Wednesday: "Wed",
-                          Thursday: "Thu",
-                          Friday: "Fri",
-                          Saturday: "Sat",
-                          Sunday: "Sun",
+                          Monday: WEEKDAY_NAMES[1],
+                          Tuesday: WEEKDAY_NAMES[2],
+                          Wednesday: WEEKDAY_NAMES[3],
+                          Thursday: WEEKDAY_NAMES[4],
+                          Friday: WEEKDAY_NAMES[5],
+                          Saturday: WEEKDAY_NAMES[6],
+                          Sunday: WEEKDAY_NAMES[0],
                         };
 
                         const isWeekOff = weeklyOffDays.some((offDay) => {
@@ -2777,8 +2740,7 @@ function AttendanceTracker({
                             {!isFuture && value !== "NA" && (() => {
                               // Check if this cell has read-only statuses (from backend)
                               // Only Present, Absent, Half Day, and empty cells can be edited
-                              const editableStatuses = ["P", "A", "P/A", null, undefined, ""];
-                              const isReadOnlyStatus = value && !editableStatuses.includes(value);
+                              const isReadOnlyStatus = value && !EDITABLE_STATUSES.includes(value);
                               
                               // Check if this date is outside the editable range
                               const dateString = `${monthYear.year}-${String(new Date(`${monthYear.month} 1, ${monthYear.year}`).getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -3135,10 +3097,10 @@ function AttendanceTracker({
                         className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       >
                         {(() => {
-                          const currentYear = new Date().getFullYear();
+                          const currentYear = getCurrentYear();
                           const years = [];
                           // Only show current year and past years
-                          for (let year = currentYear; year >= 2024; year--) {
+                          for (let year = currentYear; year >= MIN_YEAR; year--) {
                             years.push(year);
                           }
                           return years.map((year) => (
@@ -3152,20 +3114,7 @@ function AttendanceTracker({
 
                     {/* Month Grid */}
                     <div className="grid grid-cols-3 gap-1">
-                      {[
-                        "Jan",
-                        "Feb",
-                        "Mar",
-                        "Apr",
-                        "May",
-                        "Jun",
-                        "Jul",
-                        "Aug",
-                        "Sep",
-                        "Oct",
-                        "Nov",
-                        "Dec",
-                      ].map((month, index) => {
+                                              {SHORT_MONTH_NAMES.map((month, index) => {
                         const isSelected =
                           selectedDateForAll &&
                           new Date(selectedDateForAll).getMonth() === index;
@@ -3179,37 +3128,30 @@ function AttendanceTracker({
                           ? new Date(selectedDateForAll).getFullYear()
                           : currentYear;
                         
-                        // Check if payroll settings are available for freeze logic
+                        // Check if payroll is frozen for month selection
                         let isEditableMonth = true;
-                        if (payrollSettings && payrollSettings.payrollEnablementDate && payrollSettings.freezeAfterDays) {
-                          const payrollEnablementDate = payrollSettings.payrollEnablementDate;
-                          const freezeAfterDays = payrollSettings.freezeAfterDays;
-                          const isCurrentMonthFrozen = currentDay > payrollEnablementDate + freezeAfterDays;
-                          
+                        if (isPayrollFrozen(getMonthNumber(selectedMonth), parseInt(selectedYear))) {
+                          // If payroll is frozen for this month, no months are editable
+                          isEditableMonth = false;
+                        } else {
+                          // When not frozen, use month range logic
                           if (selectedYear === currentYear) {
                             if (index === currentMonth) {
                               // Current month: always editable
                               isEditableMonth = true;
                             } else if (index === currentMonth - 1) {
-                              // Previous month: check if it's frozen
-                              isEditableMonth = !isCurrentMonthFrozen;
+                              // Previous month: editable when not frozen
+                              isEditableMonth = true;
                             } else {
                               // Other months: not editable
                               isEditableMonth = false;
                             }
                           } else if (selectedYear === currentYear - 1) {
                             // Previous year: only allow if it's December and current month is January
-                            isEditableMonth = index === 11 && currentMonth === 0 && !isCurrentMonthFrozen;
+                            isEditableMonth = index === 11 && currentMonth === 0;
                           } else {
                             isEditableMonth = false;
                           }
-                        } else {
-                          // Fallback to original logic if payroll settings not available
-                          const isFutureMonth =
-                            selectedYear > currentYear ||
-                            (selectedYear === currentYear &&
-                              index > currentMonth);
-                          isEditableMonth = !isFutureMonth;
                         }
 
                         return (
@@ -3254,12 +3196,6 @@ function AttendanceTracker({
                                 newDate.getDate()
                               ).padStart(2, "0")}`;
 
-                              console.log(
-                                "Month clicked:",
-                                month,
-                                "Formatted date:",
-                                formattedDate
-                              );
                               handleDateSelectForAll(formattedDate);
                             }}
                             className={`p-2 text-sm rounded-md transition-colors ${
@@ -3444,7 +3380,7 @@ function AttendanceTracker({
                     }
 
                     // Apply the selected status to all employees except those with read-only statuses
-                    const editableStatuses = ["P", "A", "P/A", null, undefined, ""];
+                    const editableStatuses = EDITABLE_STATUSES;
                     const newData = { ...allEmployeesAttendanceData };
                     filteredEmployeesForModal.forEach((employee) => {
                       const currentStatus =
@@ -3588,8 +3524,7 @@ function AttendanceTracker({
 
                             // Check if this cell has read-only statuses (from backend)
                             // Only Present, Absent, Half Day, and empty cells can be edited
-                            const editableStatuses = ["P", "A", "P/A", null, undefined, ""];
-                            const isReadOnlyStatus = value && !editableStatuses.includes(value);
+                            const isReadOnlyStatus = value && !EDITABLE_STATUSES.includes(value);
                             
                             if (isNaStatus || isReadOnlyStatus) {
                               // Render read-only cell (like NA but with original color for non-NA statuses)

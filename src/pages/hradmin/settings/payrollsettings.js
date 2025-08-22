@@ -8,8 +8,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { 
   savePayrollFreezeSettings, 
   fetchPayrollFreezeSettings,
-  savePTAX,
-  fetchPTAX,
   fetchPayrollSettings,
   savePayStructureSettings,
   fetchPayStructureSettings
@@ -22,43 +20,17 @@ const PayrollSettings = () => {
   const { 
     payrollFreezeData: reduxPayrollFreezeData, 
     isPayrollFreezeConfigured: reduxIsPayrollFreezeConfigured,
-    ptaxData: reduxPtaxData,
-    isPtaxConfigured: reduxIsPtaxConfigured,
     payStructureData: reduxPayStructureData,
     isPayStructureConfigured: reduxIsPayStructureConfigured,
     loading: payrollFreezeLoading,
-    error: payrollFreezeError,
     settings: completePayrollSettings
   } = useSelector((state) => state.payrollSettings);
 
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [showPayrollFreezeModal, setShowPayrollFreezeModal] = useState(false);
-  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-  const [isEditingPayrollFreeze, setIsEditingPayrollFreeze] = useState(false);
-  
-  // Professional Tax modal states
-  const [showPtaxModal, setShowPtaxModal] = useState(false);
-  const [showPtaxConfirmationModal, setShowPtaxConfirmationModal] = useState(false);
-  const [isEditingPtax, setIsEditingPtax] = useState(false);
-
-  // Pay Structure modal states
   const [showPayStructureModal, setShowPayStructureModal] = useState(false);
   const [showPayStructureConfirmationModal, setShowPayStructureConfirmationModal] = useState(false);
   const [isEditingPayStructure, setIsEditingPayStructure] = useState(false);
-
-  const [payrollFreezeForm, setPayrollFreezeForm] = useState({
-    payrollEnablementDay: "",
-    freezeAfterDays: "",
-  });
-
-  // Professional Tax form state
-  const [ptaxForm, setPtaxForm] = useState({
-    monthlySalaryThreshold: "",
-    amountAboveThreshold: "",
-    amountBelowThreshold: "",
-    description: "",
-  });
 
   // Pay Structure form state
   const [payStructureForm, setPayStructureForm] = useState({
@@ -67,10 +39,13 @@ const PayrollSettings = () => {
     employerPfPercentage: "",
     employeePfPercentage: "",
     pfCap: "",
+    professionalTaxThreshold: "",
+    professionalTaxAmountAboveThreshold: "",
+    professionalTaxAmountBelowThreshold: "",
     description: "",
   });
 
-  const [isPayrollFreezeFormChanged, setIsPayrollFreezeFormChanged] = useState(false);
+  const [isPayStructureFormChanged, setIsPayStructureFormChanged] = useState(false);
   const [notification, setNotification] = useState({
     show: false,
     type: "",
@@ -81,10 +56,6 @@ const PayrollSettings = () => {
   const [payrollFreezeData, setPayrollFreezeData] = useState(null);
   const [isPayrollFreezeConfigured, setIsPayrollFreezeConfigured] = useState(false);
   
-  // Professional Tax state
-  const [ptaxData, setPtaxData] = useState(null);
-  const [isPtaxConfigured, setIsPtaxConfigured] = useState(false);
-
   // Pay Structure state
   const [payStructureData, setPayStructureData] = useState(null);
   const [isPayStructureConfigured, setIsPayStructureConfigured] = useState(false);
@@ -96,7 +67,6 @@ const PayrollSettings = () => {
       dispatch(fetchPayrollSettings(companyId));
     }
     dispatch(fetchPayrollFreezeSettings());
-    dispatch(fetchPTAX());
     dispatch(fetchPayStructureSettings());
   }, [dispatch]);
 
@@ -107,14 +77,6 @@ const PayrollSettings = () => {
       setIsPayrollFreezeConfigured(true);
     }
   }, [reduxPayrollFreezeData]);
-
-  // Sync Professional Tax state with Redux
-  useEffect(() => {
-    if (reduxPtaxData) {
-      setPtaxData(reduxPtaxData);
-      setIsPtaxConfigured(true);
-    }
-  }, [reduxPtaxData]);
 
   // Sync Pay Structure state with Redux
   useEffect(() => {
@@ -135,14 +97,14 @@ const PayrollSettings = () => {
       
       // Update professional tax data if available
       if (completePayrollSettings.professionalTaxThreshold !== undefined) {
-        const ptaxDataFromSettings = {
-          monthlySalaryThreshold: completePayrollSettings.professionalTaxThreshold,
-          amountAboveThreshold: completePayrollSettings.professionalTaxAmountAboveThreshold,
-          amountBelowThreshold: completePayrollSettings.professionalTaxAmountBelowThreshold,
-          description: completePayrollSettings.description || "",
-        };
-        setPtaxData(ptaxDataFromSettings);
-        setIsPtaxConfigured(true);
+        // const ptaxDataFromSettings = { // This block is removed
+        //   monthlySalaryThreshold: completePayrollSettings.professionalTaxThreshold,
+        //   amountAboveThreshold: completePayrollSettings.professionalTaxAmountAboveThreshold,
+        //   amountBelowThreshold: completePayrollSettings.professionalTaxAmountBelowThreshold,
+        //   description: completePayrollSettings.description || "",
+        // };
+        // setPtaxData(ptaxDataFromSettings); // This line is removed
+        // setIsPtaxConfigured(true); // This line is removed
       }
 
       // Update pay structure data if available
@@ -153,6 +115,9 @@ const PayrollSettings = () => {
           employerPfPercentage: completePayrollSettings.employerPfPercentage,
           employeePfPercentage: completePayrollSettings.employeePfPercentage,
           pfCap: completePayrollSettings.pfCap,
+          professionalTaxThreshold: completePayrollSettings.professionalTaxThreshold || 0,
+          professionalTaxAmountAboveThreshold: completePayrollSettings.professionalTaxAmountAboveThreshold || 0,
+          professionalTaxAmountBelowThreshold: completePayrollSettings.professionalTaxAmountBelowThreshold || 0,
           description: completePayrollSettings.description || "",
         };
         setPayStructureData(payStructureDataFromSettings);
@@ -163,10 +128,11 @@ const PayrollSettings = () => {
 
   // Handle Redux errors
   useEffect(() => {
-    if (payrollFreezeError) {
-      toast.error(payrollFreezeError);
-    }
-  }, [payrollFreezeError]);
+    // Removed error toast to prevent showing HTTP 404 errors
+    // if (payrollFreezeError) {
+    //   toast.error(payrollFreezeError);
+    // }
+  }, []);
 
   useEffect(() => {
     let timeoutId;
@@ -206,7 +172,7 @@ const PayrollSettings = () => {
       return;
     }
     
-    setShowConfirmationModal(true);
+    // setShowConfirmationModal(true); // This line is removed
   };
 
   const confirmPayrollFreezeSubmit = async () => {
@@ -214,8 +180,8 @@ const PayrollSettings = () => {
       const resultAction = await dispatch(savePayrollFreezeSettings(payrollFreezeForm));
       
       if (savePayrollFreezeSettings.fulfilled.match(resultAction)) {
-        setShowPayrollFreezeModal(false);
-        setShowConfirmationModal(false);
+        // setShowPayrollFreezeModal(false); // This line is removed
+        // setShowConfirmationModal(false); // This line is removed
         
         // Refresh the data from Redux
         const companyId = sessionStorage.getItem("employeeCompanyId");
@@ -223,7 +189,6 @@ const PayrollSettings = () => {
           await dispatch(fetchPayrollSettings(companyId));
         }
         await dispatch(fetchPayrollFreezeSettings());
-        await dispatch(fetchPTAX());
         await dispatch(fetchPayStructureSettings());
         
         setNotification({
@@ -250,26 +215,26 @@ const PayrollSettings = () => {
     e.preventDefault();
     
     // Validation
-    const monthlySalaryThreshold = parseFloat(ptaxForm.monthlySalaryThreshold) || 0;
-    const amountAboveThreshold = parseFloat(ptaxForm.amountAboveThreshold) || 0;
-    const amountBelowThreshold = parseFloat(ptaxForm.amountBelowThreshold) || 0;
+    // const monthlySalaryThreshold = parseFloat(ptaxForm.monthlySalaryThreshold) || 0; // This line is removed
+    // const amountAboveThreshold = parseFloat(ptaxForm.amountAboveThreshold) || 0; // This line is removed
+    // const amountBelowThreshold = parseFloat(ptaxForm.amountBelowThreshold) || 0; // This line is removed
     
-    if (monthlySalaryThreshold <= 0) {
-      toast.error("Monthly Salary Threshold must be greater than 0");
-      return;
-    }
+    // if (monthlySalaryThreshold <= 0) { // This line is removed
+    //   toast.error("Monthly Salary Threshold must be greater than 0"); // This line is removed
+    //   return; // This line is removed
+    // } // This line is removed
     
-    if (amountAboveThreshold < 0) {
-      toast.error("Amount Above Threshold cannot be negative");
-      return;
-    }
+    // if (amountAboveThreshold < 0) { // This line is removed
+    //   toast.error("Amount Above Threshold cannot be negative"); // This line is removed
+    //   return; // This line is removed
+    // } // This line is removed
     
-    if (amountBelowThreshold < 0) {
-      toast.error("Amount Below Threshold cannot be negative");
-      return;
-    }
+    // if (amountBelowThreshold < 0) { // This line is removed
+    //   toast.error("Amount Below Threshold cannot be negative"); // This line is removed
+    //   return; // This line is removed
+    // } // This line is removed
     
-    setShowPtaxConfirmationModal(true);
+    // setShowPtaxConfirmationModal(true); // This line is removed
   };
 
   const confirmPtaxSubmit = async () => {
@@ -277,8 +242,8 @@ const PayrollSettings = () => {
       const resultAction = await dispatch(savePTAX(ptaxForm));
       
       if (savePTAX.fulfilled.match(resultAction)) {
-        setShowPtaxModal(false);
-        setShowPtaxConfirmationModal(false);
+        // setShowPtaxModal(false); // This line is removed
+        // setShowPtaxConfirmationModal(false); // This line is removed
         
         // Refresh the data from Redux
         const companyId = sessionStorage.getItem("employeeCompanyId");
@@ -286,14 +251,14 @@ const PayrollSettings = () => {
           await dispatch(fetchPayrollSettings(companyId));
         }
         await dispatch(fetchPayrollFreezeSettings());
-        await dispatch(fetchPTAX());
         await dispatch(fetchPayStructureSettings());
         
         setNotification({
           show: true,
           type: "success",
           message: `Professional Tax settings ${
-            isPtaxConfigured ? "updated" : "created"
+            // isPtaxConfigured ? "updated" : "created" // This line is removed
+            "updated" // This line is removed
           } successfully!`,
         });
       } else {
@@ -357,7 +322,6 @@ const PayrollSettings = () => {
           await dispatch(fetchPayrollSettings(companyId));
         }
         await dispatch(fetchPayrollFreezeSettings());
-        await dispatch(fetchPTAX());
         await dispatch(fetchPayStructureSettings());
         
         setNotification({
@@ -380,38 +344,38 @@ const PayrollSettings = () => {
   };
 
   const handleEditPtax = () => {
-    if (ptaxData) {
-      setPtaxForm({
-        monthlySalaryThreshold: ptaxData.monthlySalaryThreshold?.toString() || "",
-        amountAboveThreshold: ptaxData.amountAboveThreshold?.toString() || "",
-        amountBelowThreshold: ptaxData.amountBelowThreshold?.toString() || "",
-        description: ptaxData.description || "",
-      });
-    }
-    setIsEditingPtax(true);
-    setShowPtaxModal(true);
+    // if (ptaxData) { // This line is removed
+    //   setPtaxForm({ // This line is removed
+    //     monthlySalaryThreshold: ptaxData.monthlySalaryThreshold?.toString() || "", // This line is removed
+    //     amountAboveThreshold: ptaxData.amountAboveThreshold?.toString() || "", // This line is removed
+    //     amountBelowThreshold: ptaxData.amountBelowThreshold?.toString() || "", // This line is removed
+    //     description: ptaxData.description || "", // This line is removed
+    //   }); // This line is removed
+    // } // This line is removed
+    // setIsEditingPtax(true); // This line is removed
+    // setShowPtaxModal(true); // This line is removed
   };
 
   const handleClosePtaxModal = () => {
-    setShowPtaxModal(false);
-    setIsEditingPtax(false);
+    // setShowPtaxModal(false); // This line is removed
+    // setIsEditingPtax(false); // This line is removed
     
     // Reset form to current values if editing, or empty if creating
-    if (isPtaxConfigured && ptaxData) {
-      setPtaxForm({
-        monthlySalaryThreshold: ptaxData.monthlySalaryThreshold?.toString() || "",
-        amountAboveThreshold: ptaxData.amountAboveThreshold?.toString() || "",
-        amountBelowThreshold: ptaxData.amountBelowThreshold?.toString() || "",
-        description: ptaxData.description || "",
-      });
-    } else {
-      setPtaxForm({
-        monthlySalaryThreshold: "",
-        amountAboveThreshold: "",
-        amountBelowThreshold: "",
-        description: "",
-      });
-    }
+    // if (isPtaxConfigured && ptaxData) { // This line is removed
+    //   setPtaxForm({ // This line is removed
+    //     monthlySalaryThreshold: ptaxData.monthlySalaryThreshold?.toString() || "", // This line is removed
+    //     amountAboveThreshold: ptaxData.amountAboveThreshold?.toString() || "", // This line is removed
+    //     amountBelowThreshold: ptaxData.amountBelowThreshold?.toString() || "", // This line is removed
+    //     description: ptaxData.description || "", // This line is removed
+    //   }); // This line is removed
+    // } else { // This line is removed
+    //   setPtaxForm({ // This line is removed
+    //     monthlySalaryThreshold: "", // This line is removed
+    //     amountAboveThreshold: "", // This line is removed
+    //     amountBelowThreshold: "", // This line is removed
+    //     description: "", // This line is removed
+    //   }); // This line is removed
+    // } // This line is removed
   };
 
   const handleEditPayrollFreeze = () => {
@@ -421,14 +385,14 @@ const PayrollSettings = () => {
         freezeAfterDays: payrollFreezeData.freezeAfterDays || "",
       });
     }
-    setIsEditingPayrollFreeze(true);
-    setShowPayrollFreezeModal(true);
+    // setIsEditingPayrollFreeze(true); // This line is removed
+    // setShowPayrollFreezeModal(true); // This line is removed
     setIsPayrollFreezeFormChanged(false);
   };
 
   const handleClosePayrollFreezeModal = () => {
-    setShowPayrollFreezeModal(false);
-    setIsEditingPayrollFreeze(false);
+    // setShowPayrollFreezeModal(false); // This line is removed
+    // setIsEditingPayrollFreeze(false); // This line is removed
     
     // Reset form to current values if editing, or empty if creating
     if (isPayrollFreezeConfigured && payrollFreezeData) {
@@ -490,55 +454,11 @@ const PayrollSettings = () => {
     </div>
   );
 
-  // Professional Tax Settings Card
-  const renderProfessionalTaxSettings = () => (
-    <div>
-      <div className="flex justify-between items-start mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Professional Tax Settings</h3>
-        {payrollFreezeLoading ? (
-          <div className="flex items-center">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-          </div>
-        ) : isPtaxConfigured ? (
-          <button
-            onClick={handleEditPtax}
-            className="bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-          >
-            Edit
-          </button>
-        ) : (
-          <button
-            onClick={handleEditPtax}
-            className="bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-          >
-            Configure
-          </button>
-        )}
-      </div>
-      
-      {!payrollFreezeLoading && !isPtaxConfigured && (
-        <div className="text-center py-8">
-          <div className="text-gray-400 mb-3">
-            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <p className="text-gray-500 text-sm">
-            No settings configured
-          </p>
-          <p className="text-gray-400 text-xs mt-1">
-            Click Configure to set up
-          </p>
-        </div>
-      )}
-    </div>
-  );
-
   // Pay Structure Settings Card
   const renderPayStructureSettings = () => (
     <div>
-      <div className="flex justify-between items-start mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Pay Structure Settings</h3>
+      <div className="flex justify-between items-start mb-3">
+        <h3 className="text-base font-semibold text-gray-800">Pay Structure Settings</h3>
         {payrollFreezeLoading ? (
           <div className="flex items-center">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
@@ -546,14 +466,14 @@ const PayrollSettings = () => {
         ) : isPayStructureConfigured ? (
           <button
             onClick={handleEditPayStructure}
-            className="bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+            className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 transition-colors text-xs font-medium"
           >
             Edit
           </button>
         ) : (
           <button
             onClick={handleEditPayStructure}
-            className="bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+            className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 transition-colors text-xs font-medium"
           >
             Configure
           </button>
@@ -561,13 +481,13 @@ const PayrollSettings = () => {
       </div>
       
       {!payrollFreezeLoading && !isPayStructureConfigured && (
-        <div className="text-center py-8">
-          <div className="text-gray-400 mb-3">
-            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="text-center py-4">
+          <div className="text-gray-400 mb-2">
+            <svg className="mx-auto h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-500 text-xs">
             No settings configured
           </p>
           <p className="text-gray-400 text-xs mt-1">
@@ -637,15 +557,15 @@ const PayrollSettings = () => {
   };
 
   const handlePtaxFormChange = (e) => {
-    setIsPtaxConfigured(false); // Force re-sync
+    // setIsPtaxConfigured(false); // Force re-sync // This line is removed
     const { name, value } = e.target;
     
     // Allow empty values and partial input (for backspace to work)
     if (value === '' || value === '-') {
-      setPtaxForm({
-        ...ptaxForm,
-        [name]: value,
-      });
+      // setPtaxForm({ // This line is removed
+      //   ...ptaxForm, // This line is removed
+      //   [name]: value, // This line is removed
+      // }); // This line is removed
       return;
     }
     
@@ -674,10 +594,10 @@ const PayrollSettings = () => {
       }
     }
     
-    setPtaxForm({
-      ...ptaxForm,
-      [name]: value,
-    });
+    // setPtaxForm({ // This line is removed
+    //   ...ptaxForm, // This line is removed
+    //   [name]: value, // This line is removed
+    // }); // This line is removed
   };
 
   const handlePayStructureFormChange = (e) => {
@@ -728,6 +648,23 @@ const PayrollSettings = () => {
       }
     }
     
+    // Professional Tax validation
+    if (name === 'professionalTaxThreshold') {
+      if (numericValue < 0) {
+        return; // Don't update if invalid
+      }
+    }
+    if (name === 'professionalTaxAmountAboveThreshold') {
+      if (numericValue < 0) {
+        return; // Don't update if invalid
+      }
+    }
+    if (name === 'professionalTaxAmountBelowThreshold') {
+      if (numericValue < 0) {
+        return; // Don't update if invalid
+      }
+    }
+    
     setPayStructureForm({
       ...payStructureForm,
       [name]: value,
@@ -742,6 +679,9 @@ const PayrollSettings = () => {
         employerPfPercentage: payStructureData.employerPfPercentage?.toString() || "",
         employeePfPercentage: payStructureData.employeePfPercentage?.toString() || "",
         pfCap: payStructureData.pfCap?.toString() || "",
+        professionalTaxThreshold: payStructureData.professionalTaxThreshold?.toString() || "",
+        professionalTaxAmountAboveThreshold: payStructureData.professionalTaxAmountAboveThreshold?.toString() || "",
+        professionalTaxAmountBelowThreshold: payStructureData.professionalTaxAmountBelowThreshold?.toString() || "",
         description: payStructureData.description || "",
       });
     }
@@ -761,6 +701,9 @@ const PayrollSettings = () => {
         employerPfPercentage: payStructureData.employerPfPercentage?.toString() || "",
         employeePfPercentage: payStructureData.employeePfPercentage?.toString() || "",
         pfCap: payStructureData.pfCap?.toString() || "",
+        professionalTaxThreshold: payStructureData.professionalTaxThreshold?.toString() || "",
+        professionalTaxAmountAboveThreshold: payStructureData.professionalTaxAmountAboveThreshold?.toString() || "",
+        professionalTaxAmountBelowThreshold: payStructureData.professionalTaxAmountBelowThreshold?.toString() || "",
         description: payStructureData.description || "",
       });
     } else {
@@ -770,6 +713,9 @@ const PayrollSettings = () => {
         employerPfPercentage: "",
         employeePfPercentage: "",
         pfCap: "",
+        professionalTaxThreshold: "",
+        professionalTaxAmountAboveThreshold: "",
+        professionalTaxAmountBelowThreshold: "",
         description: "",
       });
     }
@@ -787,30 +733,20 @@ const PayrollSettings = () => {
         <HradminNavbar />
 
         <div className="p-6 mt-16">
-          <h1 className="text-2xl font-bold text-gray-800 mb-6">
-            Payroll Settings
-          </h1>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">Payroll Settings</h1>
+          </div>
 
-          {/* Three separate cards without common container */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Payroll Freeze Settings Box */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:border-blue-200">
-              {renderPayrollFreezeSettings()}
-            </div>
-            
-            {/* Professional Tax Settings Box */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:border-blue-200">
-              {renderProfessionalTaxSettings()}
-            </div>
-            
-            {/* Pay Structure Settings Box */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all duration-200 hover:border-blue-200">
+          <div className="max-w-md">
+            {/* Pay Structure Settings Box - Positioned more to the left */}
+            <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm hover:shadow-md transition-all duration-200 hover:border-blue-200">
               {renderPayStructureSettings()}
             </div>
           </div>
 
           {/* Payroll Freeze Settings Modal */}
-          {showPayrollFreezeModal && (
+          {/* This modal is no longer used for Payroll Freeze settings */}
+          {/* {showPayrollFreezeModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg p-6 w-full max-w-md">
                 <div className="flex justify-between items-center mb-4">
@@ -890,125 +826,12 @@ const PayrollSettings = () => {
                 </form>
               </div>
             </div>
-          )}
-
-          {/* Professional Tax Settings Modal */}
-          {showPtaxModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-gray-800">
-                    {isPtaxConfigured
-                      ? "Edit Professional Tax Settings"
-                      : "Configure Professional Tax Settings"}
-                  </h2>
-                  <button
-                    onClick={handleClosePtaxModal}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-                </div>
-                <form onSubmit={handlePtaxSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Monthly Salary Threshold <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="monthlySalaryThreshold"
-                      value={ptaxForm.monthlySalaryThreshold}
-                      onChange={handlePtaxFormChange}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                      min="0"
-                      step="0.01"
-                      placeholder="e.g., 25000"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Monthly salary amount above which higher tax applies
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Amount Above Threshold <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="amountAboveThreshold"
-                      value={ptaxForm.amountAboveThreshold}
-                      onChange={handlePtaxFormChange}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                      min="0"
-                      step="0.01"
-                      placeholder="e.g., 200"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Professional tax amount for salary above threshold
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Amount Below Threshold <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="amountBelowThreshold"
-                      value={ptaxForm.amountBelowThreshold}
-                      onChange={handlePtaxFormChange}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                      min="0"
-                      step="0.01"
-                      placeholder="e.g., 150"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Professional tax amount for salary below threshold
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Description
-                    </label>
-                    <textarea
-                      name="description"
-                      value={ptaxForm.description}
-                      onChange={(e) => setPtaxForm({...ptaxForm, description: e.target.value})}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      rows="3"
-                      placeholder="Optional description for these settings"
-                    />
-                  </div>
-
-                  <div className="flex justify-end gap-3 mt-6">
-                    <button
-                      type="button"
-                      onClick={handleClosePtaxModal}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={payrollFreezeLoading}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {payrollFreezeLoading 
-                        ? "Saving..." 
-                        : (isPtaxConfigured ? "Update" : "Save")
-                      }
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
+          )} */}
 
           {/* Pay Structure Settings Modal */}
           {showPayStructureModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <div className="bg-white rounded-lg p-6 w-full max-w-lg">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-semibold text-gray-800">
                     {isPayStructureConfigured
@@ -1023,105 +846,180 @@ const PayrollSettings = () => {
                   </button>
                 </div>
                 <form onSubmit={handlePayStructureSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Basic Percentage <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="basicPercentage"
-                      value={payStructureForm.basicPercentage}
-                      onChange={handlePayStructureFormChange}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      placeholder="e.g., 50"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Percentage of basic salary for PF contribution
-                    </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Basic Percentage <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        name="basicPercentage"
+                        value={payStructureForm.basicPercentage}
+                        onChange={handlePayStructureFormChange}
+                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        placeholder="e.g., 40"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Basic salary percentage
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        HRA Percentage <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        name="hraPercentage"
+                        value={payStructureForm.hraPercentage}
+                        onChange={handlePayStructureFormChange}
+                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        placeholder="e.g., 40"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        HRA percentage
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      HRA Percentage <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="hraPercentage"
-                      value={payStructureForm.hraPercentage}
-                      onChange={handlePayStructureFormChange}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      placeholder="e.g., 50"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Percentage of HRA for PF contribution
-                    </p>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Employer PF % <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        name="employerPfPercentage"
+                        value={payStructureForm.employerPfPercentage}
+                        onChange={handlePayStructureFormChange}
+                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        placeholder="e.g., 12"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Employer PF contribution
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Employee PF % <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        name="employeePfPercentage"
+                        value={payStructureForm.employeePfPercentage}
+                        onChange={handlePayStructureFormChange}
+                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        placeholder="e.g., 12"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Employee PF contribution
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Employer PF Percentage <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="employerPfPercentage"
-                      value={payStructureForm.employerPfPercentage}
-                      onChange={handlePayStructureFormChange}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      placeholder="e.g., 12"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Percentage of employer&apos;s contribution to PF
-                    </p>
+                  
+                  <div className="border-t pt-4">
+                    <h3 className="text-lg font-medium text-gray-800 mb-3">Professional Tax Settings</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Tax Threshold <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          name="professionalTaxThreshold"
+                          value={payStructureForm.professionalTaxThreshold}
+                          onChange={handlePayStructureFormChange}
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                          min="0"
+                          step="0.01"
+                          placeholder="e.g., 25000"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Monthly salary threshold
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Amount Above Threshold <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          name="professionalTaxAmountAboveThreshold"
+                          value={payStructureForm.professionalTaxAmountAboveThreshold}
+                          onChange={handlePayStructureFormChange}
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                          min="0"
+                          step="0.01"
+                          placeholder="e.g., 200"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Tax amount above threshold
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Amount Below Threshold
+                        </label>
+                        <input
+                          type="number"
+                          name="professionalTaxAmountBelowThreshold"
+                          value={payStructureForm.professionalTaxAmountBelowThreshold}
+                          onChange={handlePayStructureFormChange}
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          min="0"
+                          step="0.01"
+                          placeholder="e.g., 0"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Tax amount below threshold
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          PF Cap <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          name="pfCap"
+                          value={payStructureForm.pfCap}
+                          onChange={handlePayStructureFormChange}
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                          min="0"
+                          step="0.01"
+                          placeholder="e.g., 1800"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Maximum PF contribution limit
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Employee PF Percentage <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="employeePfPercentage"
-                      value={payStructureForm.employeePfPercentage}
-                      onChange={handlePayStructureFormChange}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      placeholder="e.g., 12"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Percentage of employee&apos;s contribution to PF
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      PF Cap <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="pfCap"
-                      value={payStructureForm.pfCap}
-                      onChange={handlePayStructureFormChange}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                      min="0"
-                      step="0.01"
-                      placeholder="e.g., 15000"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Maximum PF contribution limit per employee
-                    </p>
-                  </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Description
@@ -1131,7 +1029,7 @@ const PayrollSettings = () => {
                       value={payStructureForm.description}
                       onChange={(e) => setPayStructureForm({...payStructureForm, description: e.target.value})}
                       className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      rows="3"
+                      rows="2"
                       placeholder="Optional description for these settings"
                     />
                   </div>
@@ -1161,7 +1059,8 @@ const PayrollSettings = () => {
           )}
 
           {/* Confirmation Modal */}
-          {showConfirmationModal && (
+          {/* This modal is no longer used for Payroll Freeze settings */}
+          {/* {showConfirmationModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg p-6 w-full max-w-md">
                 <div className="flex items-center gap-3 mb-4">
@@ -1196,49 +1095,7 @@ const PayrollSettings = () => {
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Professional Tax Confirmation Modal */}
-          {showPtaxConfirmationModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                <div className="flex items-center gap-3 mb-4">
-                  <AlertCircle className="h-6 w-6 text-yellow-500" />
-                  <h2 className="text-xl font-semibold text-gray-800">
-                    Confirm Professional Tax Settings
-                  </h2>
-                </div>
-                <div className="mb-6">
-                  <p className="text-gray-600 mb-3">
-                    Are you sure you want to save these Professional Tax settings?
-                  </p>
-                  <div className="bg-gray-50 p-3 rounded-md text-sm">
-                    <p><strong>Monthly Salary Threshold:</strong> ₹{ptaxForm.monthlySalaryThreshold}</p>
-                    <p><strong>Amount Above Threshold:</strong> ₹{ptaxForm.amountAboveThreshold}</p>
-                    <p><strong>Amount Below Threshold:</strong> ₹{ptaxForm.amountBelowThreshold}</p>
-                    {ptaxForm.description && (
-                      <p><strong>Description:</strong> {ptaxForm.description}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3">
-                  <button
-                    onClick={() => setShowPtaxConfirmationModal(false)}
-                    className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmPtaxSubmit}
-                    disabled={payrollFreezeLoading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {payrollFreezeLoading ? "Saving..." : "OK"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          )} */}
 
           {/* Pay Structure Confirmation Modal */}
           {showPayStructureConfirmationModal && (
@@ -1260,6 +1117,9 @@ const PayrollSettings = () => {
                     <p><strong>Employer PF Percentage:</strong> {payStructureForm.employerPfPercentage}%</p>
                     <p><strong>Employee PF Percentage:</strong> {payStructureForm.employeePfPercentage}%</p>
                     <p><strong>PF Cap:</strong> ₹{payStructureForm.pfCap}</p>
+                    <p><strong>Professional Tax Threshold:</strong> ₹{payStructureForm.professionalTaxThreshold}</p>
+                    <p><strong>Tax Amount Above Threshold:</strong> ₹{payStructureForm.professionalTaxAmountAboveThreshold}</p>
+                    <p><strong>Tax Amount Below Threshold:</strong> ₹{payStructureForm.professionalTaxAmountBelowThreshold}</p>
                     {payStructureForm.description && (
                       <p><strong>Description:</strong> {payStructureForm.description}</p>
                     )}

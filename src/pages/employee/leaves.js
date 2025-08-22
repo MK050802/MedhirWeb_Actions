@@ -20,7 +20,7 @@ import CustomDatePicker from "@/components/CustomDatePicker";
 import { getItemFromSessionStorage } from "@/redux/slices/sessionStorageSlice";
 import withAuth from "@/components/withAuth";
 import { fetchEmployeeLeavePolicy } from "@/redux/slices/leavePolicySlice";
-import { fetchPayrollSettings } from "@/redux/slices/payrollSettingsSlice";
+import { checkPayrollFreezeStatus } from "@/redux/slices/payrollFreezeStatusSlice";
 
 // Helper to format numbers: show two decimals only if not whole
 function formatNumber(num) {
@@ -56,7 +56,7 @@ const Leaves = () => {
   const { leaveHistory, historyLoading, historyError } = useSelector(
     (state) => state.leave
   );
-  console.log(leaveHistory);
+
   const {
     balance: leaveBalance,
     loading: isLoadingBalance,
@@ -138,10 +138,7 @@ const Leaves = () => {
 
     
 
-    console.log(
-      "Disabled dates from leave history:",
-      disabledDates.map((d) => d.toISOString().split("T")[0])
-    );
+
     return disabledDates;
   };
 
@@ -185,10 +182,22 @@ const Leaves = () => {
   const openModal = async () => {
     await dispatch(fetchEmployeeLeavePolicy(employeeId));
     
-    // Fetch payroll settings for date restrictions
+    // Check payroll freeze status for date restrictions
     const companyId = sessionStorage.getItem("employeeCompanyId");
     if (companyId) {
-      await dispatch(fetchPayrollSettings(companyId));
+      // Get current month - 1 (previous month) for payroll freeze check
+      const currentDate = new Date();
+      const previousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      const month = previousMonth.getMonth() + 1; // getMonth() returns 0-11, so add 1
+      const year = previousMonth.getFullYear();
+      
+
+      
+      dispatch(checkPayrollFreezeStatus({
+        companyId,
+        year,
+        month
+      }));
     }
     
     setIsModalOpen(true);
@@ -203,10 +212,22 @@ const Leaves = () => {
   const openCompOffModal = async () => {
     await dispatch(fetchEmployeeLeavePolicy(employeeId));
     
-    // Fetch payroll settings for date restrictions
+    // Check payroll freeze status for date restrictions
     const companyId = sessionStorage.getItem("employeeCompanyId");
     if (companyId) {
-      await dispatch(fetchPayrollSettings(companyId));
+      // Get current month - 1 (previous month) for payroll freeze check
+      const currentDate = new Date();
+      const previousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      const month = previousMonth.getMonth() + 1; // getMonth() returns 0-11, so add 1
+      const year = previousMonth.getFullYear();
+      
+
+      
+      dispatch(checkPayrollFreezeStatus({
+        companyId,
+        year,
+        month
+      }));
     }
     
     setIsCompOffModalOpen(true);

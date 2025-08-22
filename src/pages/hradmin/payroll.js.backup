@@ -113,7 +113,18 @@ function PayrollManagement() {
   // Ref to track the last API call to prevent duplicates
   const lastApiCallRef = useRef('');
 
+  // Add logging for state changes
+  useEffect(() => {
+    console.log('📅 selectedMonth changed to:', selectedMonth);
+  }, [selectedMonth]);
 
+  useEffect(() => {
+    console.log('📅 selectedYear changed to:', selectedYear);
+  }, [selectedYear]);
+
+  useEffect(() => {
+    console.log('🏢 selectedCompanyId changed to:', selectedCompanyId);
+  }, [selectedCompanyId]);
 
   const { employees, loading, err } = useSelector((state) => state.employees);
 
@@ -225,7 +236,7 @@ function PayrollManagement() {
         }
       }
     } catch (error) {
-
+      console.error("Failed to update arrears paid:", error);
       const errorMessage = error.message || "Failed to update arrears paid. Please try again.";
       toast.error(errorMessage);
     }
@@ -328,7 +339,7 @@ function PayrollManagement() {
         }
       }
     } catch (error) {
-
+      console.error("Failed to update arrears deducted:", error);
       const errorMessage = error.message || "Failed to update arrears deducted. Please try again.";
       toast.error(errorMessage);
     }
@@ -415,7 +426,7 @@ function PayrollManagement() {
       fetchCompanyAdvances();
       
     } catch (error) {
-
+      console.error("Failed to update employee advance:", error);
       // Don't update local state if API fails
     }
   };
@@ -510,31 +521,24 @@ function PayrollManagement() {
     return selectedMonth === payrollMonth && selectedYear === payrollYear;
   };
 
-  // Function to fetch company employee advances
-  const fetchCompanyAdvances = useCallback(() => {
-    const monthMap = {
-      January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
-      July: 7, August: 8, September: 9, October: 10, November: 11, December: 12
-    };
-    
-    const month = monthMap[selectedMonth];
-    const year = parseInt(selectedYear);
-    
-    dispatch(fetchCompanyEmployeeAdvances({
-      companyId: selectedCompanyId,
-      month,
-      year
-    }));
-  }, [dispatch, selectedCompanyId, selectedMonth, selectedYear]);
-
   // Check if payroll is currently frozen based on freeze status API
   const isPayrollFrozen = () => {
+    console.log('🔒 isPayrollFrozen() called with state:', {
+      freezeStatus,
+      freezeStatusLoading,
+      freezeStatusType: typeof freezeStatus,
+      freezeStatusValue: freezeStatus
+    });
+    
     // Use the API response directly - true means frozen, false means active
     if (freezeStatusLoading) {
+      console.log('🔒 Freeze status is still loading, assuming not frozen for now');
       return false;
     }
     
     if (freezeStatus !== undefined && freezeStatus !== null) {
+      console.log('🔒 Using freeze status from API:', freezeStatus);
+      
       // Handle different possible API response formats
       let frozen = false;
       if (typeof freezeStatus === 'boolean') {
@@ -551,10 +555,12 @@ function PayrollManagement() {
         frozen = freezeStatus === 1;
       }
       
+      console.log('🔒 Payroll frozen status (parsed):', frozen);
       return frozen;
     }
     
     // Fallback: if API is not working, assume payroll is not frozen
+    console.log('🔒 Payroll freeze status API not available, using fallback (not frozen)');
     return false;
   };
 
@@ -605,7 +611,174 @@ function PayrollManagement() {
     setOriginalAdvanceValues({});
   };
 
+  // Single useEffect to handle payroll API calls on mount and month/year changes
+  useEffect(() => {
+    if (selectedCompanyId && selectedMonth && selectedYear && !isApiCallInProgress) {
+      const monthMap = {
+        January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
+        July: 7, August: 8, September: 9, October: 10, November: 11, December: 12
+      };
+      
+      const params = {
+        companyId: selectedCompanyId,
+        year: parseInt(selectedYear),
+        month: monthMap[selectedMonth],
+      };
+      
+      // Create a unique key for this API call
+      const apiCallKey = `${selectedCompanyId}_${selectedMonth}_${selectedYear}`;
+      
+      // Prevent duplicate API calls for the same month/year
+      if (lastApiCallRef.current === apiCallKey) {
+        console.log('🔄 API already called for this month/year, skipping:', apiCallKey);
+        return;
+      }
+      
+      console.log('🚀 Calling payroll API with params:', params);
+      
+      // Set flag to prevent multiple calls
+      setIsApiCallInProgress(true);
+      setIsFetchingView(true);
+      setPayrollErrorDetails(null);
+      
+      // Update the ref to track this API call
+      lastApiCallRef.current = apiCallKey;
+      
+      dispatch(getPayroll(params))
+        .unwrap()
+        .then((result) => {
+          console.log('✅ Payroll API call successful:', result);
+          setPayrollErrorDetails(null);
+          
+          if (result && Array.isArray(result) && result.length > 0) {
+            setIsCalculatePayrollClicked(true);
+            setDataLastUpdated(new Date());
+            setPayrollCalculatedForCurrentMonth(true);
+          } else {
+            setIsCalculatePayrollClicked(false);
+            setPayrollCalculatedForCurrentMonth(false);
+            setDataLastUpdated(null);
+          }
+        })
+        .catch((error) => {
+          console.log('❌ Payroll API call failed:', error);
+          setPayrollErrorDetails(error);
+          setIsCalculatePayrollClicked(false);
+          setPayrollCalculatedForCurrentMonth(false);
+        })
+        .finally(() => {
+          setIsFetchingView(false);
+          setIsApiCallInProgress(false);
+        });
+    }
+  }, [selectedCompanyId, selectedMonth, selectedYear, dispatch]);
 
+  // Cleanup function to reset the API call ref when month/year changes
+  useEffect(() => {
+    // Reset the ref when month/year changes to allow new API calls
+    lastApiCallRef.current = '';
+  }, [selectedMonth, selectedYear]);
+
+  // Handle freeze status API errors and logging
+  useEffect(() => {
+    if (freezeStatusLoading === false) {
+      if (freezeStatus) {
+        console.log('🔒 Payroll freeze status loaded:', freezeStatus);
+      } else {
+        console.log('🔒 Payroll freeze status check completed, no data');
+      }
+    }
+  }, [freezeStatusLoading, freezeStatus]);
+
+  // Handle freeze creation errors
+  useEffect(() => {
+    if (freezeCreateError) {
+      toast.error(freezeCreateError.message || "Failed to freeze payroll");
+    }
+  }, [freezeCreateError]);
+
+  // Initialize arrears values when payroll data is loaded
+  useEffect(() => {
+    if (payroll && Array.isArray(payroll) && payroll.length > 0) {
+      const initialArrearsValues = {};
+      const initialArrearsDeductedValues = {};
+      payroll.forEach(item => {
+        initialArrearsValues[item.employeeId] = item.arrearsPaid;
+        initialArrearsDeductedValues[item.employeeId] = item.arrearsDeducted;
+      });
+      setArrearsValues(initialArrearsValues);
+      setArrearsDeductedValues(initialArrearsDeductedValues);
+      // Also set original values for cancel functionality
+      setOriginalArrearsValues(initialArrearsValues);
+      setOriginalArrearsDeductedValues(initialArrearsDeductedValues);
+      
+      // If we have payroll data, ensure the calculation state is set
+      if (!isCalculatePayrollClicked) {
+        setIsCalculatePayrollClicked(true);
+        setDataLastUpdated(new Date());
+      }
+    }
+  }, [payroll, isCalculatePayrollClicked]);
+
+  // Initialize advance values when employees data is loaded
+  useEffect(() => {
+    if (employees && Array.isArray(employees) && employees.length > 0) {
+      const initialAdvanceValues = {};
+      employees.forEach(employee => {
+        // Find corresponding advance data for this employee
+        const advanceData = companyAdvances?.find(
+          (advance) => advance.employeeId === employee.employeeId
+        );
+        
+        initialAdvanceValues[`${employee.employeeId}_thisMonth`] = advanceData?.thisMonthAdvance ?? employee.thisMonthAdvance ?? 0;
+        initialAdvanceValues[`${employee.employeeId}_deduct`] = advanceData?.deductedThisMonth ?? employee.deductInThisMonth ?? 0;
+      });
+      setAdvanceValues(initialAdvanceValues);
+      // Also set original values for cancel functionality
+      setOriginalAdvanceValues(initialAdvanceValues);
+    }
+  }, [employees, companyAdvances]);
+
+  // Handle employee advance error messages
+  useEffect(() => {
+    if (advanceError) {
+      toast.error(advanceError);
+      dispatch(clearError());
+    }
+  }, [advanceError, dispatch]);
+
+  // Function to fetch company employee advances
+  const fetchCompanyAdvances = useCallback(() => {
+    const monthMap = {
+      January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
+      July: 7, August: 8, September: 9, October: 10, November: 11, December: 12
+    };
+    
+    const month = monthMap[selectedMonth];
+    const year = parseInt(selectedYear);
+    
+    dispatch(fetchCompanyEmployeeAdvances({
+      companyId: selectedCompanyId,
+      month,
+      year
+    }));
+  }, [dispatch, selectedCompanyId, selectedMonth, selectedYear]);
+
+  // Fetch company advances when Advance tab is selected
+  useEffect(() => {
+    if (selectedSection === "Advance") {
+      fetchCompanyAdvances();
+    }
+  }, [selectedSection, fetchCompanyAdvances]);
+
+  // Fetch company advances when month/year changes (if Advance tab is active)
+  useEffect(() => {
+    if (selectedSection === "Advance") {
+      fetchCompanyAdvances();
+    }
+  }, [selectedMonth, selectedYear, selectedSection, fetchCompanyAdvances]);
+
+  console.log(payroll);
 
   const renderPayrollTable = () => (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
@@ -1244,7 +1417,7 @@ function PayrollManagement() {
                   // Find corresponding employee data for this payroll item
                   const employee = employees.find(emp => emp.employeeId === payrollItem.employeeId);
 
-
+                  console.log(arrearsValues)
 
                   return (
                     <tr key={index} className="hover:bg-blue-50 transition-colors duration-150">
@@ -1392,7 +1565,15 @@ function PayrollManagement() {
     </div>
   );
 
-
+  // Debug freeze status state
+  useEffect(() => {
+    console.log('🔒 Freeze status Redux state:', {
+      freezeStatus,
+      freezeStatusLoading,
+      freezeStatusType: typeof freezeStatus,
+      freezeStatusValue: freezeStatus
+    });
+  }, [freezeStatus, freezeStatusLoading]);
 
   // Pay Structure form handlers
   const handlePayStructureFormChange = (e) => {
@@ -1506,7 +1687,7 @@ function PayrollManagement() {
       const month = monthMap[selectedMonth];
       const year = parseInt(selectedYear);
       
-
+      console.log('🔒 Checking payroll freeze status for:', { companyId: selectedCompanyId, year, month });
       
       dispatch(checkPayrollFreezeStatus({
         companyId: selectedCompanyId,
@@ -1548,8 +1729,11 @@ function PayrollManagement() {
       
       // Prevent duplicate API calls for the same month/year
       if (lastApiCallRef.current === apiCallKey) {
+        console.log('🔄 API already called for this month/year, skipping:', apiCallKey);
         return;
       }
+      
+      console.log('🚀 Calling payroll API with params:', params);
       
       // Set flag to prevent multiple calls
       setIsApiCallInProgress(true);
@@ -1562,6 +1746,7 @@ function PayrollManagement() {
       dispatch(getPayroll(params))
         .unwrap()
         .then((result) => {
+          console.log('✅ Payroll API call successful:', result);
           setPayrollErrorDetails(null);
           
           if (result && Array.isArray(result) && result.length > 0) {
@@ -1575,6 +1760,7 @@ function PayrollManagement() {
           }
         })
         .catch((error) => {
+          console.log('❌ Payroll API call failed:', error);
           setPayrollErrorDetails(error);
           setIsCalculatePayrollClicked(false);
           setPayrollCalculatedForCurrentMonth(false);
@@ -1592,7 +1778,16 @@ function PayrollManagement() {
     lastApiCallRef.current = '';
   }, [selectedMonth, selectedYear]);
 
-
+  // Handle freeze status API errors and logging
+  useEffect(() => {
+    if (freezeStatusLoading === false) {
+      if (freezeStatus) {
+        console.log('🔒 Payroll freeze status loaded:', freezeStatus);
+      } else {
+        console.log('🔒 Payroll freeze status check completed, no data');
+      }
+    }
+  }, [freezeStatusLoading, freezeStatus]);
 
   // Handle freeze creation errors
   useEffect(() => {
@@ -1725,7 +1920,13 @@ function PayrollManagement() {
               <button
                 disabled={!isLatestAvailableMonth() || isCalculatingPayroll || isPayrollFrozen()}
                 onClick={async () => {
-
+                  // Debug the button state
+                  console.log('🔘 Button state debug:', {
+                    isLatestAvailableMonth: isLatestAvailableMonth(),
+                    isCalculatingPayroll,
+                    isPayrollFrozen: isPayrollFrozen(),
+                    disabled: !isLatestAvailableMonth() || isCalculatingPayroll || isPayrollFrozen()
+                  });
                   
                   if (isLatestAvailableMonth() && !isCalculatingPayroll) {
                     setHasAttemptedCalculate(true);
@@ -1736,6 +1937,7 @@ function PayrollManagement() {
                     setPayrollErrorDetails(null);
 
                     try {
+                      console.log("Starting payroll calculation...");
 
                       // Convert month name to month number
                       const monthMap = {
@@ -1759,8 +1961,11 @@ function PayrollManagement() {
                         month: monthMap[selectedMonth],
                       };
 
+                      console.log("Calling generatePayroll API with:", requestBody);
+
                       // Try to generate payroll (POST). If it fails, we'll still query view to surface exact message
                       await dispatch(generatePayroll(requestBody)).unwrap();
+                      console.log("Generate payroll succeeded");
                       toast.success("Payroll calculation completed!");
                       
                       // Update our flag to mark this month as calculated
@@ -1773,7 +1978,7 @@ function PayrollManagement() {
                         month: monthMap[selectedMonth],
                       };
 
-
+                      console.log("Calling getPayroll API with:", params);
                       setIsFetchingView(true);
                       await dispatch(getPayroll(params)).unwrap();
                       setIsFetchingView(false);
@@ -1783,13 +1988,18 @@ function PayrollManagement() {
                       toast.success("Payroll data loaded successfully!");
                       
                     } catch (error) {
+                      console.error("Payroll generation failed:", error);
+                      console.log("🔍 Error details:", { status: error?.status, message: error?.message });
+                      
                       // Check if it's a 404 error (payroll settings not configured)
                       if (error?.status === 404) {
+                        console.log("🚨 404 error detected - payroll settings not configured");
                         // Set the 404 error directly without calling getPayroll
                         setPayrollErrorDetails(error);
                         setIsCalculatePayrollClicked(false);
                         setPayrollCalculatedForCurrentMonth(false);
                       } else {
+                        console.log("⚠️ Non-404 error, calling getPayroll for detailed error info");
                         // For other errors, call getPayroll to get detailed error information
                         try {
                           const monthMap = {
@@ -1851,7 +2061,7 @@ function PayrollManagement() {
                 </button>
               )}
               
-              {isLatestAvailableMonth() && (payrollCalculatedForCurrentMonth || isCalculatePayrollClicked || (payroll && Array.isArray(payroll) && payroll.length > 0)) && (
+              {isLatestAvailableMonth() && !isPayrollFrozen() && (payrollCalculatedForCurrentMonth || isCalculatePayrollClicked || (payroll && Array.isArray(payroll) && payroll.length > 0)) && (
                 <button
                   onClick={() => {
                     if (showCheckboxes) {
@@ -1870,7 +2080,7 @@ function PayrollManagement() {
                 </button>
               )}
               
-              {/* Freeze Payroll Button - Only enabled after payslips are sent and only show if not already frozen */}
+              {/* Freeze Payroll Button - Only enabled after payslips are sent */}
               {isLatestAvailableMonth() && !isPayrollFrozen() && (payrollCalculatedForCurrentMonth || isCalculatePayrollClicked || (payroll && Array.isArray(payroll) && payroll.length > 0)) && (
                 <button
                   onClick={() => setShowFreezePayrollModal(true)}
@@ -2011,7 +2221,7 @@ function PayrollManagement() {
           {/* Actionable panel after calculate attempt */}
           {payrollErrorDetails && hasAttemptedCalculate && !isFetchingView && (
             <div className="mt-4">
-
+              {console.log("🎯 Displaying error:", { status: payrollErrorDetails?.status, message: payrollErrorDetails?.message })}
               <div className="bg-white border border-gray-300 rounded-lg shadow-sm p-4">
                 <h3 className="text-lg font-semibold text-red-600 mb-3">
                   Payroll Generation Failed
@@ -2189,6 +2399,7 @@ function PayrollManagement() {
                     }
                     
                   } catch (error) {
+                    console.error("Failed to send payslips:", error);
                     toast.error("Failed to send payslips. Please try again.");
                   }
                 }}
@@ -2541,8 +2752,12 @@ function PayrollManagement() {
                       isFrozen: true
                     };
                     
+                    console.log('🔒 Freezing payroll with payload:', freezePayload);
+                    
                     // Call the API to freeze payroll
                     const result = await dispatch(createPayrollFreezeStatus(freezePayload)).unwrap();
+                    
+                    console.log('✅ Payroll freeze result:', result);
                     
                     // Close modal and show success message
                     setShowFreezePayrollModal(false);
@@ -2556,6 +2771,7 @@ function PayrollManagement() {
                     }));
                     
                   } catch (error) {
+                    console.error("Failed to freeze payroll:", error);
                     const errorMessage = error?.message || "Failed to freeze payroll. Please try again.";
                     toast.error(errorMessage);
                   }

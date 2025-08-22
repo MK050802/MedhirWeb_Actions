@@ -26,7 +26,8 @@ import {
 } from "@/redux/slices/leaveBalanceSlice";
 import { fetchOneEmployeeAttendanceOneMonth } from "@/redux/slices/attendancesSlice";
 import { fetchEmployeeLeavePolicy } from "@/redux/slices/leavePolicySlice";
-import { fetchPayrollSettings } from "@/redux/slices/payrollSettingsSlice";
+import { checkPayrollFreezeStatus } from "@/redux/slices/payrollFreezeStatusSlice";
+import { fetchEmployeeDetails } from "@/redux/slices/payslipSlice";
 import CustomDatePicker from "@/components/CustomDatePicker";
 import getConfig from "next/config";
 const { publicRuntimeConfig } = getConfig();
@@ -130,6 +131,11 @@ const EmployeeAttendance = () => {
         return;
       }
 
+      // Fetch employee details for joining date (if not already loaded)
+      if (!employeeData) {
+        dispatch(fetchEmployeeDetails(employeeId));
+      }
+
       // Dispatch the action to fetch attendance data
       dispatch(
         fetchOneEmployeeAttendanceOneMonth({
@@ -139,7 +145,7 @@ const EmployeeAttendance = () => {
         })
       );
     },
-    [dispatch]
+    [dispatch, employeeData]
   );
 
   useEffect(() => {
@@ -153,6 +159,9 @@ const EmployeeAttendance = () => {
       toast.error("Employee ID not found in session storage.");
       return;
     }
+
+    // Fetch employee details for joining date
+    dispatch(fetchEmployeeDetails(employeeId));
 
     // Fetch data for current month and year
     dispatch(
@@ -287,10 +296,22 @@ const EmployeeAttendance = () => {
   const openModal = async () => {
     await dispatch(fetchEmployeeLeavePolicy(employeeId));
     
-    // Fetch payroll settings for date restrictions
+    // Check payroll freeze status for date restrictions
     const companyId = sessionStorage.getItem("employeeCompanyId");
     if (companyId) {
-      await dispatch(fetchPayrollSettings(companyId));
+      // Get current month - 1 (previous month) for payroll freeze check
+      const currentDate = new Date();
+      const previousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      const month = previousMonth.getMonth() + 1; // getMonth() returns 0-11, so add 1
+      const year = previousMonth.getFullYear();
+      
+
+      
+      dispatch(checkPayrollFreezeStatus({
+        companyId,
+        year,
+        month
+      }));
     }
     
     setIsModalOpen(true);
@@ -400,10 +421,7 @@ const EmployeeAttendance = () => {
       }
     });
 
-    console.log(
-      "Disabled dates from leave history:",
-      disabledDates.map((d) => d.toISOString().split("T")[0])
-    );
+
     return disabledDates;
   };
 
