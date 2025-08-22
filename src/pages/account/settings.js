@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaFileInvoice, FaUniversity, FaTags } from 'react-icons/fa';
+import { FaFileInvoice, FaUniversity, FaTags, FaPlus, FaTrash } from 'react-icons/fa';
 import MainLayout from '@/components/MainLayout';
 import { toast } from 'sonner';
 import getConfig from 'next/config';
@@ -7,7 +7,7 @@ import { getItemFromSessionStorage } from '@/redux/slices/sessionStorageSlice';
 
 const { publicRuntimeConfig } = getConfig();
 
-const DocumentSettings = ({ settings, onSettingsChange }) => {
+const DocumentSettings = ({ settings, onSettingsChange, onSaveChanges, isSaving }) => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -161,53 +161,32 @@ const DocumentSettings = ({ settings, onSettingsChange }) => {
         </div>
       </div>
 
-      {/* Branding Section */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Branding & Defaults</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
-                {settings.logo ? (
-                  <img src={settings.logo} alt="Company Logo" className="object-contain h-full w-full rounded-md" />
-                ) : (
-                  <div className="text-center">
-                    <svg className="mx-auto h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-xs text-gray-400 mt-1 block">No Logo</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex-1">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  disabled
-                  aria-disabled="true"
-                  className="cursor-not-allowed opacity-50 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                />
-                <p className="text-xs text-gray-500 mt-1">Logo upload is currently disabled</p>
-              </div>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Default Terms & Conditions</label>
-            <textarea
-              value={settings.terms}
-              onChange={(e) => onSettingsChange('terms', e.target.value)}
-              rows="3"
-              disabled
-              aria-disabled="true"
-              className="w-full p-3 border border-gray-300 rounded-md shadow-sm bg-gray-50 opacity-75 cursor-not-allowed focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., Payment due within 30 days of invoice date."
-            />
-            <p className="text-xs text-gray-500 mt-1">Terms & conditions editing is currently disabled</p>
-          </div>
-        </div>
+      {/* Save Changes Button */}
+      <div className="flex justify-end pt-6">
+        <button
+          onClick={onSaveChanges}
+          disabled={isSaving}
+          className="px-6 py-3 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {isSaving ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Saving...
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Save Changes
+            </>
+          )}
+        </button>
       </div>
+
     </div>
   );
 };
@@ -625,39 +604,34 @@ const CompanyBankDetails = ({ bankAccounts, onAddBankAccount, onEditBankAccount,
 };
 
 const VendorTagsSettings = ({ vendorTags, onAddTag, onRemoveTag }) => {
-  const [newTag, setNewTag] = useState('');
-  const [isAdding, setIsAdding] = useState(false);
+  const [newTag, setNewTag] = useState({ name: '', showError: false });
 
-  const handleAddTag = async (e) => {
-    e.preventDefault();
-    if (!newTag.trim()) {
-      toast.error('Please enter a tag name');
-      return;
+  const handleAddTag = async () => {
+    if (!newTag.name || !newTag.name.trim()) { 
+      setNewTag(prev => ({ ...prev, showError: true }));
+      return; 
     }
 
-    if (vendorTags.some(tag => tag.toLowerCase() === newTag.trim().toLowerCase())) {
+    if (vendorTags.some(tag => tag.toLowerCase() === newTag.name.trim().toLowerCase())) {
       toast.error('This tag already exists');
       return;
     }
 
-    setIsAdding(true);
     try {
-      await onAddTag(newTag.trim());
-      setNewTag('');
-      toast.success('Vendor tag added successfully!');
+      await onAddTag(newTag.name.trim());
+      setNewTag({ name: '', showError: false });
     } catch (error) {
-      toast.error('Failed to add vendor tag');
-    } finally {
-      setIsAdding(false);
+      // Error handling is now done in the parent component
+      console.error('Error adding vendor tag:', error);
     }
   };
 
   const handleRemoveTag = async (tagToRemove) => {
     try {
       await onRemoveTag(tagToRemove);
-      toast.success('Vendor tag removed successfully!');
     } catch (error) {
-      toast.error('Failed to remove vendor tag');
+      // Error handling is now done in the parent component
+      console.error('Error removing vendor tag:', error);
     }
   };
 
@@ -667,69 +641,52 @@ const VendorTagsSettings = ({ vendorTags, onAddTag, onRemoveTag }) => {
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Vendor Tags Management</h3>
         <p className="text-sm text-gray-600 mb-6">Add and manage vendor tags that can be used when creating vendor profiles.</p>
         
-        {/* Add New Tag Form */}
-        <form onSubmit={handleAddTag} className="mb-6">
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-              placeholder="Enter vendor tag (e.g., Critical Supplier, Local Vendor)"
-              className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              maxLength={50}
+        {/* Add New Tag Form - Matching Asset Management style */}
+        <div className="flex items-end gap-4 mb-6 w-full max-w-3xl mx-auto">
+          <div className="flex-1 min-w-[220px]">
+            <input 
+              value={newTag.name} 
+              onChange={e => setNewTag({...newTag, name: e.target.value, showError: false})} 
+              placeholder="New Tag Name (e.g., Critical Supplier)" 
+              className="w-full p-3 border rounded-md text-base" 
             />
-            <button
-              type="submit"
-              disabled={isAdding || !newTag.trim()}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isAdding ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Adding...
-                </>
-              ) : (
-                <>
-                  <FaTags className="w-4 h-4" />
-                  Add Tag
-                </>
-              )}
-            </button>
+            {newTag.showError && (
+              <p className="text-red-600 text-sm mt-1">Enter tag name</p>
+            )}
           </div>
-        </form>
+          <button 
+            onClick={handleAddTag} 
+            className="px-7 py-3 bg-blue-600 text-white rounded-md whitespace-nowrap text-base font-semibold shadow-sm transition-all duration-150 hover:bg-blue-700"
+          >
+            <FaPlus className="inline mr-1" /> Add Tag
+          </button>
+        </div>
 
-        {/* Tags List */}
-        <div>
-          <h4 className="text-md font-medium text-gray-700 mb-3">Current Vendor Tags</h4>
+        {/* Tags List - Matching Asset Management style */}
+        <div className="space-y-2">
           {vendorTags.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
               <FaTags className="mx-auto h-12 w-12 text-gray-300 mb-3" />
               <p className="text-sm">No vendor tags added yet</p>
               <p className="text-xs text-gray-400">Add your first vendor tag above</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {vendorTags.map((tag, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <span className="text-sm font-medium text-gray-700 truncate">{tag}</span>
+            vendorTags.map((tag, index) => (
+              <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-gray-700">{tag}</span>
+                </div>
+                <div className="flex items-center gap-2">
                   <button
+                    className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded"
+                    title="Delete Tag"
                     onClick={() => handleRemoveTag(tag)}
-                    className="ml-2 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                    title="Remove tag"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <FaTrash />
                   </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))
           )}
         </div>
 
@@ -980,10 +937,15 @@ const AccountSettingsPage = () => {
         return;
       }
 
-      const res = await fetch(`${publicRuntimeConfig.apiURL}/api/settings/vendor-tags/${companyId}?companyId=${companyId}`, {
+      const payload = {
+        companyId,
+        tag: newTag
+      };
+
+      const res = await fetch(`${publicRuntimeConfig.apiURL}/api/settings/account/company/${companyId}?companyId=${companyId}`, {
         method: 'POST',
         headers: buildAuthHeaders(token),
-        body: JSON.stringify({ tag: newTag }),
+        body: JSON.stringify(payload),
       });
 
       if (res.status === 401) {
@@ -996,9 +958,11 @@ const AccountSettingsPage = () => {
         throw new Error(errorText || 'Failed to add vendor tag');
       }
 
+      // Add to local state after successful API call
       setVendorTags(prev => [...prev, newTag]);
+      toast.success('Vendor tag added successfully!');
     } catch (error) {
-      throw error;
+      toast.error(`Failed to add vendor tag: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -1015,10 +979,15 @@ const AccountSettingsPage = () => {
         return;
       }
 
-      const res = await fetch(`${publicRuntimeConfig.apiURL}/api/settings/vendor-tags/${companyId}?companyId=${companyId}`, {
+      const payload = {
+        companyId,
+        tag: tagToRemove
+      };
+
+      const res = await fetch(`${publicRuntimeConfig.apiURL}/api/settings/account/company/${companyId}?companyId=${companyId}`, {
         method: 'DELETE',
         headers: buildAuthHeaders(token),
-        body: JSON.stringify({ tag: tagToRemove }),
+        body: JSON.stringify(payload),
       });
 
       if (res.status === 401) {
@@ -1031,9 +1000,11 @@ const AccountSettingsPage = () => {
         throw new Error(errorText || 'Failed to remove vendor tag');
       }
 
+      // Remove from local state after successful API call
       setVendorTags(prev => prev.filter(tag => tag !== tagToRemove));
+      toast.success('Vendor tag removed successfully!');
     } catch (error) {
-      throw error;
+      toast.error(`Failed to remove vendor tag: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -1119,13 +1090,13 @@ const AccountSettingsPage = () => {
 
         // Fetch vendor tags
         try {
-          const tagsRes = await fetch(`${publicRuntimeConfig.apiURL}/api/settings/vendor-tags/${companyId}?companyId=${companyId}`, {
+          const tagsRes = await fetch(`${publicRuntimeConfig.apiURL}/api/settings/account/company/${companyId}?companyId=${companyId}`, {
             headers: buildAuthHeaders(token),
           });
           if (tagsRes.ok) {
             const tagsData = await tagsRes.json();
-            if (tagsData.tags && Array.isArray(tagsData.tags)) {
-              setVendorTags(tagsData.tags);
+            if (tagsData.vendorTags && Array.isArray(tagsData.vendorTags)) {
+              setVendorTags(tagsData.vendorTags);
             }
           }
         } catch (error) {
@@ -1239,7 +1210,12 @@ const AccountSettingsPage = () => {
             {/* Tab Content */}
             <div className="p-4">
               {activeTab === 'documents' && (
-                <DocumentSettings settings={documentSettings} onSettingsChange={handleDocumentSettingsChange} />
+                <DocumentSettings 
+                  settings={documentSettings} 
+                  onSettingsChange={handleDocumentSettingsChange}
+                  onSaveChanges={handleSaveChanges}
+                  isSaving={isSaving}
+                />
               )}
               {activeTab === 'vendor-tags' && (
                 <VendorTagsSettings 

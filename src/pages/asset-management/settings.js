@@ -88,24 +88,12 @@ import {
 // Import custom form management functions based on CustomFormController.java
 import {
     fetchCustomForms,
-    fetchCustomFormById,
     createCustomForm,
     updateCustomForm,
     deleteCustomForm,
     fetchFormFields,
-    addFieldToForm,
-    updateField,
-    deleteField,
-    assignFormToCategory,
-    unassignFormFromCategory,
-    fetchFormsByCategory,
-    previewForm,
-    duplicateForm,
     toggleFormStatus,
-    submitFormData,
-    fetchFormDataForAsset,
-    fetchAllFormDataForAsset,
-    deleteFormData,
+    assignFormToSubCategory,
     setCurrentForm,
     clearCurrentForm
 } from '@/redux/slices/customFormSlice';
@@ -195,9 +183,52 @@ const CategorySettings = ({
     onEditIdFormat, 
     onDeleteIdFormat, 
     onSaveIdFormat, 
-    onCancelIdFormat 
+    onCancelIdFormat,
+    activeTab,
+    newSubCatFieldsByCategory,
+    setNewSubCatFieldsByCategory
 }) => {
-    const [newSubCatFieldsByCategory, setNewSubCatFieldsByCategory] = useState({});
+    
+    // Clear subcategory input error states when component unmounts or when switching tabs
+    useEffect(() => {
+        return () => {
+            setNewSubCatFieldsByCategory({});
+        };
+    }, [setNewSubCatFieldsByCategory]);
+    
+    // Clear subcategory input fields when switching away from categories tab
+    useEffect(() => {
+        if (activeTab !== 'categories') {
+            setNewSubCatFieldsByCategory({});
+            // Also clear any subcategory input error states
+            setNewSubCatFieldsByCategory(prev => {
+                const cleared = {};
+                Object.keys(prev).forEach(categoryId => {
+                    if (prev[categoryId]?.showError) {
+                        cleared[categoryId] = { ...prev[categoryId], showError: false };
+                    }
+                });
+                return cleared;
+            });
+        }
+    }, [activeTab, setNewSubCatFieldsByCategory]);
+    
+    // Clear subcategory input fields when component unmounts
+    useEffect(() => {
+        return () => {
+            setNewSubCatFieldsByCategory({});
+        };
+    }, [setNewSubCatFieldsByCategory]);
+    
+    // Clear input error states when component unmounts
+    useEffect(() => {
+        return () => {
+            // Reset newCategory error state
+            if (newCategory.showError) {
+                setNewCategory(prev => ({ ...prev, showError: false }));
+            }
+        };
+    }, [newCategory.showError]);
     
     console.log('CategorySettings rendered with categories:', editedCategories);
     console.log('Categories structure in CategorySettings:', editedCategories?.map(cat => ({
@@ -619,7 +650,16 @@ const CategorySettings = ({
     );
 };
 
-const LocationSettings = ({ editing, editedLocations, setEditedLocations, newLocation, setNewLocation, onAdd, onFieldChange, loading, onDelete, onSave, onCancel }) => {
+const LocationSettings = ({ editing, editedLocations, setEditedLocations, newLocation, setNewLocation, onAdd, onFieldChange, loading, onDelete, onSave, onCancel, activeTab }) => {
+    // Clear input error states when switching away from locations tab
+    React.useEffect(() => {
+        if (activeTab !== 'locations') {
+            if (newLocation.showError) {
+                setNewLocation(prev => ({ ...prev, showError: false }));
+            }
+        }
+    }, [activeTab, newLocation.showError, setNewLocation]);
+    
     return (
         <SettingsSection title="Asset Locations" subtitle="Manage the physical locations where assets are stored or assigned.">
             <div className="flex items-end gap-4 mb-4 w-full max-w-3xl mx-auto">
@@ -716,7 +756,16 @@ const LocationSettings = ({ editing, editedLocations, setEditedLocations, newLoc
     );
 };
 
-const StatusSettings = ({ editing, editedStatuses, setEditedStatuses, newStatus, setNewStatus, onAdd, onFieldChange, loading, onDelete, onSave, onCancel }) => {
+const StatusSettings = ({ editing, editedStatuses, setEditedStatuses, newStatus, setNewStatus, onAdd, onFieldChange, loading, onDelete, onSave, onCancel, activeTab }) => {
+    // Clear input error states when switching away from statuses tab
+    React.useEffect(() => {
+        if (activeTab !== 'statuses') {
+            if (newStatus.showError) {
+                setNewStatus(prev => ({ ...prev, showError: false }));
+            }
+        }
+    }, [activeTab, newStatus.showError, setNewStatus]);
+    
     return (
         <SettingsSection title="Asset Status Labels" subtitle="Customize the lifecycle statuses for your assets.">
             <div className="flex items-end gap-4 mb-4 w-full max-w-2xl mx-auto">
@@ -832,23 +881,12 @@ const StatusSettings = ({ editing, editedStatuses, setEditedStatuses, newStatus,
 };
 
 // Enhanced Custom Form Builder Component with proper Redux integration
-const CustomFormBuilder = ({ editing, onDeleteForm }) => {
+const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, editingFormId, setEditingFormId, formName, setFormName, selectedCategory, setSelectedCategory, selectedSubCategory, setSelectedSubCategory, fields, setFields, formError, setFormError, fieldErrors, setFieldErrors, searchTerm, setSearchTerm, debouncedSearchTerm, setDebouncedSearchTerm, formLoading, setFormLoading }) => {
     const dispatch = useDispatch();
     const { categories, loading: categoriesLoading } = useSelector(state => state.assetCategories);
     const { forms, currentForm, loading: formsLoading, creating: creatingForm, updating: updatingForm } = useSelector(state => state.customForm);
     
-    const [view, setView] = useState('list'); // 'list', 'create', 'edit'
-    const [editingFormId, setEditingFormId] = useState(null);
-    const [formName, setFormName] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState('');
-    const [selectedSubCategory, setSelectedSubCategory] = useState('');
-    const [fields, setFields] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    
-    // Performance optimization: Debounced search for better responsiveness
-    const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
 
     // Load forms and categories on component mount
     useEffect(() => {
@@ -936,7 +974,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
             return String(id) === String(selectedSubCategory);
         });
         if (!exists) setSelectedSubCategory('');
-    }, [selectedCategory, subCategoriesForSelectedCategory]);
+    }, [selectedCategory, subCategoriesForSelectedCategory, selectedSubCategory]);
 
     // Ensure selectedCategory and selectedSubCategory are properly set when editing and categories are loaded
     useEffect(() => {
@@ -978,7 +1016,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                 }
             }
         }
-    }, [view, editingFormId, categories, forms]);
+    }, [view, editingFormId, categories, forms, selectedCategory]);
 
     // Ensure fields are properly mapped when form data is available
     useEffect(() => {
@@ -1008,7 +1046,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                 setFields([]);
             }
         }
-    }, [view, editingFormId, forms]);
+    }, [view, editingFormId, forms, fields]);
 
     // Monitor fields state changes for debugging
     useEffect(() => {
@@ -1056,18 +1094,42 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
         setSelectedCategory('');
         setSelectedSubCategory('');
         setFields([]);
-        setError('');
+        setFormError('');
+        // Clear field-specific errors when starting a new form
+        setFieldErrors({
+            formName: '',
+            category: '',
+            subCategory: '',
+            fields: []
+        });
         dispatch(clearCurrentForm());
     };
     
     const handleFormNameChange = (value) => {
         setFormName(value);
-        if (error) setError('');
+        if (formError) setFormError('');
+        // Clear field-specific error when user starts typing
+        if (fieldErrors.formName) {
+            setFieldErrors(prev => ({ ...prev, formName: '' }));
+        }
     };
     
     const handleCategoryChange = (value) => {
         setSelectedCategory(value);
-        if (error) setError('');
+        if (formError) setFormError('');
+        // Clear field-specific error when user starts typing
+        if (fieldErrors.category) {
+            setFieldErrors(prev => ({ ...prev, category: '' }));
+        }
+    };
+
+    const handleSubCategoryChange = (value) => {
+        setSelectedSubCategory(value);
+        if (formError) setFormError('');
+        // Clear field-specific error when user starts typing
+        if (fieldErrors.subCategory) {
+            setFieldErrors(prev => ({ ...prev, subCategory: '' }));
+        }
     };
 
     // Helper function to map API fields to frontend format
@@ -1146,7 +1208,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
             // Based on the API response, the category is stored in assignedCategoryId
             const categoryToUse = form.assignedCategoryId || form.categoryId || '';
             setSelectedCategory(categoryToUse);
-            setError(''); // Clear any previous errors
+            setFormError(''); // Clear any previous errors
             
             // Set subcategory from form data if available
             // Based on the API response, the subcategory is stored in assignedSubCategoryId
@@ -1171,7 +1233,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                 console.log('Fields set after edit:', mappedFields);
             }, 0);
             
-            setError('');
+            setFormError('');
             dispatch(setCurrentForm(form));
             
             console.log('Form details set:', {
@@ -1220,7 +1282,14 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
         setSelectedCategory('');
         setSelectedSubCategory('');
         setFields([]);
-        setError('');
+        setFormError('');
+        // Clear field-specific errors when going back to list
+        setFieldErrors({
+            formName: '',
+            category: '',
+            subCategory: '',
+            fields: []
+        });
         dispatch(clearCurrentForm());
     };
 
@@ -1308,7 +1377,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
         setFields(updatedFields);
         
         // Clear error when user starts typing
-        if (error) setError('');
+        if (formError) setFormError('');
     };
 
     const addDropdownOption = (fieldId) => {
@@ -1349,22 +1418,24 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
     const handleSaveForm = async () => {
         let hasErrors = false;
         
+        // Clear previous field errors
+        setFieldErrors({
+            formName: '',
+            category: '',
+            subCategory: '',
+            fields: []
+        });
+        
         // Validate form name
         if (!formName || !formName.trim()) {
-            setError('Form name is required');
+            setFieldErrors(prev => ({ ...prev, formName: 'Form name is required' }));
             hasErrors = true;
         }
 
         // Validate category selection
-        if (!selectedCategory) {
-            setError('Please select a category');
-            return;
-        }
-
-        // Additional validation for category
         if (!selectedCategory || selectedCategory.trim() === '') {
-            setError('Category is required and cannot be empty');
-            return;
+            setFieldErrors(prev => ({ ...prev, category: 'Please select a category' }));
+            hasErrors = true;
         }
 
         // Log the selected category for debugging
@@ -1376,54 +1447,48 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
         });
 
         if (fields.length === 0) {
-            setError('At least one field is required');
+            setFormError('At least one field is required');
             hasErrors = true;
         }
 
         // Validate individual fields
         for (let field of fields) {
             if (!field.name || !field.name.trim()) {
-                setError('All fields must have a name');
+                setFormError('All fields must have a name');
                 hasErrors = true;
                 break;
             }
             if (field.type === 'dropdown' && field.options.length === 0) {
-                setError('Dropdown fields must have at least one option');
-                return;
+                setFormError('Dropdown field must have at least one option');
+                hasErrors = true;
+                break;
             }
             
             // Additional validation for dropdown options
             if (field.type === 'dropdown' && field.options.length > 0) {
                 const invalidOptions = field.options.filter(opt => !opt.value || !opt.value.trim());
                 if (invalidOptions.length > 0) {
-                    setError(`Dropdown field "${field.name}" has empty options`);
-                    return;
+                    setFormError(`Dropdown field "${field.name}" has empty options`);
+                    hasErrors = true;
+                    break;
                 }
                 
                 // Check for duplicate option values
                 const optionValues = field.options.map(opt => opt.value.trim());
                 const uniqueOptionValues = new Set(optionValues);
                 if (optionValues.length !== uniqueOptionValues.size) {
-                    setError(`Dropdown field "${field.name}" has duplicate option values`);
-                    return;
+                    setFormError(`Dropdown field "${field.name}" has duplicate option values`);
+                    hasErrors = true;
+                    break;
                 }
             }
         }
 
-        // Additional validation for category and subcategory
-        if (!selectedCategory || typeof selectedCategory !== 'string' || selectedCategory.trim() === '') {
-            setError('Valid category is required');
-            return;
-        }
-
-        // Validate that category is not just whitespace
-        if (selectedCategory.trim().length === 0) {
-            setError('Category cannot be empty or just whitespace');
-            return;
-        }
-
-        // Validate subcategory if selected (optional but if selected, must be valid)
-        if (selectedSubCategory && selectedSubCategory.trim() !== '') {
+        // Validate subcategory selection (required)
+        if (!selectedSubCategory || selectedSubCategory.trim() === '') {
+            setFieldErrors(prev => ({ ...prev, subCategory: 'Sub-category selection is required' }));
+            hasErrors = true;
+        } else {
             // Check if the selected subcategory belongs to the selected category
             const category = categories.find(cat => 
                 cat.categoryId === selectedCategory || cat.id === selectedCategory
@@ -1435,8 +1500,8 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                 );
                 
                 if (!subcategoryExists) {
-                    setError('Selected subcategory does not belong to the selected category');
-                    return;
+                    setFieldErrors(prev => ({ ...prev, subCategory: 'Selected subcategory does not belong to the selected category' }));
+                    hasErrors = true;
                 }
             }
         }
@@ -1445,24 +1510,29 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
         const fieldNames = fields.map(f => f.name.trim()).filter(Boolean);
         const uniqueFieldNames = new Set(fieldNames);
         if (fieldNames.length !== uniqueFieldNames.size) {
-            setError('Field names must be unique');
-            return;
+            setFormError('Field names must be unique');
+            hasErrors = true;
         }
 
         // Check for empty or invalid field names
         const invalidFields = fields.filter(f => !f.name || !f.name.trim() || f.name.trim().length === 0);
         if (invalidFields.length > 0) {
-            setError(`Invalid field names found: ${invalidFields.map(f => f.name || 'unnamed').join(', ')}`);
+            setFormError(`Invalid field names found: ${invalidFields.map(f => f.name || 'unnamed').join(', ')}`);
+            hasErrors = true;
+        }
+
+        // Return early if there are validation errors
+        if (hasErrors) {
             return;
         }
 
-        setLoading(true);
-        setError('');
+        setFormLoading(true);
+        setFormError('');
 
         try {
             const companyId = getCompanyId();
             if (!companyId) {
-                setError('Company ID not found. Please refresh the page and try again.');
+                setFormError('Company ID not found. Please refresh the page and try again.');
                 return;
             }
 
@@ -1489,7 +1559,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
 
             // Final validation of the form data
             if (!formData.name || !formData.categoryId || !formData.fields || formData.fields.length === 0) {
-                setError('Invalid form data structure');
+                setFormError('Invalid form data structure');
                 return;
             }
 
@@ -1503,7 +1573,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
             });
 
             if (invalidFields.length > 0) {
-                setError(`Invalid field structure: ${invalidFields.map(f => f.name || 'unnamed').join(', ')}`);
+                setFormError(`Invalid field structure: ${invalidFields.map(f => f.name || 'unnamed').join(', ')}`);
                 return;
             }
             
@@ -1599,6 +1669,14 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                 toast.success("Form saved with subcategory assignment successfully!");
             }
             
+            // Clear field errors on successful save
+            setFieldErrors({
+                formName: '',
+                category: '',
+                subCategory: '',
+                fields: []
+            });
+            
             // Return to listing view immediately
             handleBackToList();
             
@@ -1641,10 +1719,10 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
             // Log the actual form data that was sent
             console.error('Form data that was sent:', formData);
             
-            setError(errorMessage);
+            setFormError(errorMessage);
             toast.error(errorMessage);
         } finally {
-            setLoading(false);
+            setFormLoading(false);
         }
     };
 
@@ -1977,202 +2055,215 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[calc(100vh-300px)] min-h-[600px]">
                         {/* CREATE FORM VIEW - Form Details Section */}
-                        <div className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    📝 Form Name
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formName}
-                                    onChange={(e) => setFormName(e.target.value)}
-                                    placeholder="e.g., Employee Onboarding Form, Asset Upload Form"
-                                    className="w-full p-3 border border-gray-300 rounded-md"
-                                />
-                            </div>
-
-                            <div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            📂 Select Category
-                                        </label>
-                                        <select
-                                            value={selectedCategory}
-                                            onChange={(e) => setSelectedCategory(e.target.value)}
-                                            className="w-full p-3 border border-gray-300 rounded-md"
-                                            disabled={categoriesLoading}
-                                        >
-                                            <option value="">Select a category...</option>
-                                            {categories && Array.isArray(categories) ? categories.filter(cat => cat && typeof cat === 'object').map(cat => (
-                                                <option key={cat.categoryId || cat.id} value={cat.categoryId || cat.id}>
-                                                    {cat.name}
-                                                </option>
-                                            )) : []}
-                                        </select>
-                                        {categoriesLoading && <div className="text-blue-600 text-sm mt-1">Loading categories...</div>}
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            🧩 Select Sub-Category
-                                            {selectedSubCategory && (
-                                                <span className="ml-2 text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                                                    ✓ Assigned
-                                                </span>
-                                            )}
-                                        </label>
-                                        <select
-                                            value={selectedSubCategory}
-                                            onChange={(e) => {
-                                                console.log('Subcategory selection changed:', {
-                                                    oldValue: selectedSubCategory,
-                                                    newValue: e.target.value,
-                                                    event: e.target.value
-                                                });
-                                                setSelectedSubCategory(e.target.value);
-                                            }}
-                                            className="w-full p-3 border border-gray-300 rounded-md"
-                                            disabled={!selectedCategory || categoriesLoading}
-                                        >
-                                            <option value="">Select a sub-category...</option>
-                                            {subCategoriesForSelectedCategory && Array.isArray(subCategoriesForSelectedCategory) ? subCategoriesForSelectedCategory.filter(sub => sub && typeof sub === 'object').map(sub => (
-                                                <option key={sub.subCategoryId || sub.id} value={sub.subCategoryId || sub.id}>
-                                                    {sub.name}
-                                                </option>
-                                            )) : []}
-                                        </select>
-                                        {selectedSubCategory && (
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                Form will be assigned to: {subCategoriesForSelectedCategory.find(sub => 
-                                                    (sub.subCategoryId || sub.id) === selectedSubCategory
-                                                )?.name || 'Unknown subcategory'}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <div className="flex justify-between items-center mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
-                                        <span className="text-sm text-gray-500">
-                                            {fields.length}/15 fields
-                                        </span>
-                                    </div>
-                                    <button
-                                        onClick={addField}
-                                        disabled={fields.length >= 15}
-                                        className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all duration-150 ${
-                                            fields.length >= 15
-                                                ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col h-full">
+                            {/* Scrollable Content Area */}
+                            <div className="flex-1 overflow-y-auto p-6 pr-8 space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Form Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formName}
+                                        onChange={(e) => handleFormNameChange(e.target.value)}
+                                        placeholder="e.g., Employee Onboarding Form, Asset Upload Form"
+                                        className={`w-full p-3 border rounded-md ${
+                                            fieldErrors.formName ? 'border-red-500' : 'border-gray-300'
                                         }`}
-                                    >
-                                        <FaPlus /> Add Field
-                                    </button>
+                                    />
+                                    {fieldErrors.formName && (
+                                        <p className="text-red-600 text-sm mt-1">{fieldErrors.formName}</p>
+                                    )}
                                 </div>
 
-                                {fields.length === 0 && (
-                                    <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
-                                        <div className="text-4xl mb-2">📋</div>
-                                        <p>No fields added yet. Click &quot;Add Field&quot; to get started.</p>
-                                    </div>
-                                )}
-
-                                <div className="space-y-4">
-                                    {fields.map((field, index) => (
-                                        <div key={field.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <h5 className="font-medium text-gray-800">Field {index + 1}</h5>
-                                                <button
-                                                    onClick={() => removeField(field.id)}
-                                                    className="text-red-500 hover:text-red-700"
-                                                >
-                                                    <FaTrash />
-                                                </button>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {/* Field Name */}
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                        Field Name (Label)
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={field.name}
-                                                        onChange={(e) => updateField(field.id, 'name', e.target.value)}
-                                                        placeholder="e.g., Asset Name, Employee ID"
-                                                        className="w-full p-2 border border-gray-300 rounded-md"
-                                                    />
-                                                </div>
-
-                                                {/* Field Type */}
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                        Field Type
-                                                    </label>
-                                                    <select
-                                                        value={field.type}
-                                                        onChange={(e) => updateField(field.id, 'type', e.target.value)}
-                                                        className="w-full p-2 border border-gray-300 rounded-md"
-                                                    >
-                                                        <option value="text">Text</option>
-                                                        <option value="number">Number</option>
-                                                        <option value="date">Date</option>
-                                                        <option value="file">File Upload</option>
-                                                        <option value="dropdown">Dropdown</option>
-                                                        <option value="checkbox">Checkbox</option>
-                                                        <option value="textarea">Textarea</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            {/* Field-specific options */}
-                                            <div className="mt-3">
-                                                {renderFieldInput(field)}
-                                            </div>
-
-                                            {/* Required toggle */}
-                                            <div className="mt-3">
-                                                <label className="flex items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={field.required}
-                                                        onChange={(e) => updateField(field.id, 'required', e.target.checked)}
-                                                        className="rounded border-gray-300"
-                                                    />
-                                                    <span className="text-sm font-medium text-gray-700">Required field</span>
-                                                </label>
-                                            </div>
+                                <div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Select Category <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={selectedCategory}
+                                                onChange={(e) => handleCategoryChange(e.target.value)}
+                                                className={`w-full p-3 border rounded-md ${
+                                                    fieldErrors.category ? 'border-red-500' : 'border-gray-300'
+                                                }`}
+                                                disabled={categoriesLoading}
+                                            >
+                                                <option value="">Select a category...</option>
+                                                {categories && Array.isArray(categories) ? categories.filter(cat => cat && typeof cat === 'object').map(cat => (
+                                                    <option key={cat.categoryId || cat.id} value={cat.categoryId || cat.id}>
+                                                        {cat.name}
+                                                    </option>
+                                                )) : []}
+                                            </select>
+                                            {categoriesLoading && <div className="text-blue-600 text-sm mt-1">Loading categories...</div>}
+                                            {fieldErrors.category && (
+                                                <p className="text-red-600 text-sm mt-1">{fieldErrors.category}</p>
+                                            )}
                                         </div>
-                                    ))}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Select Sub-Category <span className="text-red-500">*</span>
+                                                {selectedSubCategory && (
+                                                    <span className="ml-2 text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                                                        ✓ Assigned
+                                                    </span>
+                                                )}
+                                            </label>
+                                            <select
+                                                value={selectedSubCategory}
+                                                onChange={(e) => {
+                                                    console.log('Subcategory selection changed:', {
+                                                        oldValue: selectedSubCategory,
+                                                        newValue: e.target.value,
+                                                        event: e.target.value
+                                                    });
+                                                    handleSubCategoryChange(e.target.value);
+                                                }}
+                                                className={`w-full p-3 border rounded-md ${
+                                                    fieldErrors.subCategory ? 'border-red-500' : 'border-gray-300'
+                                                }`}
+                                                disabled={!selectedCategory || categoriesLoading}
+                                            >
+                                                <option value="">Select a sub-category...</option>
+                                                {subCategoriesForSelectedCategory && Array.isArray(subCategoriesForSelectedCategory) ? subCategoriesForSelectedCategory.filter(sub => sub && typeof sub === 'object').map(sub => (
+                                                    <option key={sub.subCategoryId || sub.id} value={sub.subCategoryId || sub.id}>
+                                                        {sub.name}
+                                                    </option>
+                                                )) : []}
+                                            </select>
+
+                                            {fieldErrors.subCategory && (
+                                                <p className="text-red-600 text-sm mt-1">{fieldErrors.subCategory}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
+                                            <span className="text-sm text-gray-500">
+                                                {fields.length}/15 fields
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={addField}
+                                            disabled={fields.length >= 15}
+                                            className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all duration-150 ${
+                                                fields.length >= 15
+                                                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                            }`}
+                                        >
+                                            <FaPlus /> Add Field
+                                        </button>
+                                    </div>
+
+                                    {fields.length === 0 && (
+                                        <div className="text-center py-8 text-red-500 border-2 border-dashed border-red-300 rounded-lg bg-red-50">
+                                            <div className="text-4xl mb-2">⚠️</div>
+                                            <p className="font-medium">No fields added yet</p>
+                                            <p className="text-sm mt-1">Click &quot;Add Field&quot; to add at least one field before saving</p>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-4">
+                                        {fields.map((field, index) => (
+                                            <div key={field.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <h5 className="font-medium text-gray-800">Field {index + 1}</h5>
+                                                    <button
+                                                        onClick={() => removeField(field.id)}
+                                                        className="text-red-500 hover:text-red-700"
+                                                    >
+                                                        <FaTrash />
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {/* Field Name */}
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                            Field Name (Label)
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={field.name}
+                                                            onChange={(e) => updateField(field.id, 'name', e.target.value)}
+                                                            placeholder="e.g., Asset Name, Employee ID"
+                                                            className="w-full p-2 border border-gray-300 rounded-md"
+                                                        />
+                                                    </div>
+
+                                                    {/* Field Type */}
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                            Field Type
+                                                        </label>
+                                                        <select
+                                                            value={field.type}
+                                                            onChange={(e) => updateField(field.id, 'type', e.target.value)}
+                                                            className="w-full p-2 border border-gray-300 rounded-md"
+                                                        >
+                                                            <option value="text">Text</option>
+                                                            <option value="number">Number</option>
+                                                            <option value="date">Date</option>
+                                                            <option value="file">File Upload</option>
+                                                            <option value="dropdown">Dropdown</option>
+                                                            <option value="checkbox">Checkbox</option>
+                                                            <option value="textarea">Textarea</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {/* Field-specific options */}
+                                                <div className="mt-3">
+                                                    {renderFieldInput(field)}
+                                                </div>
+
+                                                {/* Required toggle */}
+                                                <div className="mt-3">
+                                                    <label className="flex items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={field.required}
+                                                            onChange={(e) => updateField(field.id, 'required', e.target.checked)}
+                                                            className="rounded border-gray-300"
+                                                        />
+                                                        <span className="text-sm font-medium text-gray-700">Required field</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Save Button */}
-                            <div className="pt-4">
-                                                            <button
-                                onClick={handleSaveForm}
-                                className="w-full px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium"
-                            >
-                                {loading ? 'Saving...' : '💾 Save Form'}
-                            </button>
-                            {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+                            {/* Sticky Footer with Save Button */}
+                            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 shadow-lg">
+                                <button
+                                    onClick={handleSaveForm}
+                                    className="w-full px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium transition-colors duration-200"
+                                >
+                                    {formLoading ? 'Saving...' : 'Save Form'}
+                                </button>
                             </div>
                         </div>
 
                         {/* Preview Section */}
-                        <div className="lg:border-l lg:pl-8">
-                            {renderFormPreview()}
+                        <div className="bg-white rounded-lg border border-gray-200 p-6 overflow-hidden flex flex-col">
+                            <div className="flex-1 overflow-y-auto pr-2">
+                                {renderFormPreview()}
+                            </div>
                         </div>
                     </div>
                 </div>
             ) : (
-                                            // Edit Form View
                 <div>
                     <div className="flex justify-between items-center mb-6">
                         <div className="flex items-center gap-4">
@@ -2188,191 +2279,204 @@ const CustomFormBuilder = ({ editing, onDeleteForm }) => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[calc(100vh-300px)] min-h-[600px]">
                         {/* EDIT FORM VIEW - Form Details Section */}
-                        <div className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    📝 Form Name
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formName}
-                                    onChange={(e) => setFormName(e.target.value)}
-                                    placeholder="e.g., Employee Onboarding Form, Asset Upload Form"
-                                    className="w-full p-3 border border-gray-300 rounded-md"
-                                />
-                            </div>
-
-                            <div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            📂 Select Category
-                                        </label>
-                                        <select
-                                            value={selectedCategory}
-                                            onChange={(e) => setSelectedCategory(e.target.value)}
-                                            className="w-full p-3 border border-gray-300 rounded-md"
-                                            disabled={categoriesLoading}
-                                        >
-                                            <option value="">Select a category...</option>
-                                            {categories && Array.isArray(categories) ? categories.filter(cat => cat && typeof cat === 'object').map(cat => (
-                                                <option key={cat.categoryId || cat.id} value={cat.categoryId || cat.id}>
-                                                    {cat.name}
-                                                </option>
-                                            )) : []}
-                                        </select>
-                                        {categoriesLoading && <div className="text-blue-600 text-sm mt-1">Loading categories...</div>}
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            🧩 Select Sub-Category
-                                            {selectedSubCategory && (
-                                                <span className="ml-2 text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                                                    ✓ Assigned
-                                                </span>
-                                            )}
-                                        </label>
-                                        <select
-                                            value={selectedSubCategory}
-                                            onChange={(e) => setSelectedSubCategory(e.target.value)}
-                                            className="w-full p-3 border border-gray-300 rounded-md"
-                                            disabled={!selectedCategory || categoriesLoading}
-                                        >
-                                            <option value="">Select a sub-category...</option>
-                                            {subCategoriesForSelectedCategory && Array.isArray(subCategoriesForSelectedCategory) ? subCategoriesForSelectedCategory.filter(sub => sub && typeof sub === 'object').map(sub => (
-                                                <option key={sub.subCategoryId || sub.id} value={sub.subCategoryId || sub.id}>
-                                                    {sub.name}
-                                                </option>
-                                            )) : []}
-                                        </select>
-                                        {selectedSubCategory && (
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                Form will be assigned to: {subCategoriesForSelectedCategory.find(sub => 
-                                                    (sub.subCategoryId || sub.id) === selectedSubCategory
-                                                )?.name || 'Unknown subcategory'}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <div className="flex justify-between items-center mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
-                                        <span className="text-sm text-gray-500">
-                                            {fields.length}/15 fields
-                                        </span>
-                                    </div>
-                                    <button
-                                        onClick={addField}
-                                        disabled={fields.length >= 15}
-                                        className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all duration-150 ${
-                                            fields.length >= 15
-                                                ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                        <div className="bg-white rounded-lg border border-gray-200 p-6 overflow-hidden flex flex-col">
+                            <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Form Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formName}
+                                        onChange={(e) => handleFormNameChange(e.target.value)}
+                                        placeholder="e.g., Employee Onboarding Form, Asset Upload Form"
+                                        className={`w-full p-3 border rounded-md ${
+                                            fieldErrors.formName ? 'border-red-500' : 'border-gray-300'
                                         }`}
-                                    >
-                                        <FaPlus /> Add Field
-                                    </button>
+                                    />
+                                    {fieldErrors.formName && (
+                                        <p className="text-red-600 text-sm mt-1">{fieldErrors.formName}</p>
+                                    )}
                                 </div>
 
-                                {fields.length === 0 && (
-                                    <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
-                                        <div className="text-4xl mb-2">📋</div>
-                                        <p>No fields added yet. Click &quot;Add Field&quot; to get started.</p>
-                                    </div>
-                                )}
-
-                                <div className="space-y-4">
-                                    {fields.map((field, index) => (
-                                        <div key={field.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <h5 className="font-medium text-gray-800">Field {index + 1}</h5>
-                                                <button
-                                                    onClick={() => removeField(field.id)}
-                                                    className="text-red-500 hover:text-red-700"
-                                                >
-                                                    <FaTrash />
-                                                </button>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {/* Field Name */}
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                        Field Name (Label)
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={field.name}
-                                                        onChange={(e) => updateField(field.id, 'name', e.target.value)}
-                                                        placeholder="e.g., Asset Name, Employee ID"
-                                                        className="w-full p-2 border border-gray-300 rounded-md"
-                                                    />
-                                                </div>
-
-                                                {/* Field Type */}
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                        Field Type
-                                                    </label>
-                                                    <select
-                                                        value={field.type}
-                                                        onChange={(e) => updateField(field.id, 'type', e.target.value)}
-                                                        className="w-full p-2 border border-gray-300 rounded-md"
-                                                    >
-                                                        <option value="text">Text</option>
-                                                        <option value="number">Number</option>
-                                                        <option value="date">Date</option>
-                                                        <option value="file">File Upload</option>
-                                                        <option value="dropdown">Dropdown</option>
-                                                        <option value="checkbox">Checkbox</option>
-                                                        <option value="textarea">Textarea</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            {/* Field-specific options */}
-                                            <div className="mt-3">
-                                                {renderFieldInput(field)}
-                                            </div>
-
-                                            {/* Required toggle */}
-                                            <div className="mt-3">
-                                                <label className="flex items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={field.required}
-                                                        onChange={(e) => updateField(field.id, 'required', e.target.checked)}
-                                                        className="rounded border-gray-300"
-                                                    />
-                                                    <span className="text-sm font-medium text-gray-700">Required field</span>
-                                                </label>
-                                            </div>
+                                <div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Select Category <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={selectedCategory}
+                                                onChange={(e) => handleCategoryChange(e.target.value)}
+                                                className={`w-full p-3 border rounded-md ${
+                                                    fieldErrors.category ? 'border-red-500' : 'border-gray-300'
+                                                }`}
+                                                disabled={categoriesLoading}
+                                            >
+                                                <option value="">Select a category...</option>
+                                                {categories && Array.isArray(categories) ? categories.filter(cat => cat && typeof cat === 'object').map(cat => (
+                                                    <option key={cat.categoryId || cat.id} value={cat.categoryId || cat.id}>
+                                                        {cat.name}
+                                                    </option>
+                                                )) : []}
+                                            </select>
+                                            {categoriesLoading && <div className="text-blue-600 text-sm mt-1">Loading categories...</div>}
+                                            {fieldErrors.category && (
+                                                <p className="text-red-600 text-sm mt-1">{fieldErrors.category}</p>
+                                            )}
                                         </div>
-                                    ))}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Select Sub-Category <span className="text-red-500">*</span>
+                                                {selectedSubCategory && (
+                                                    <span className="ml-2 text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                                                        ✓ Assigned
+                                                    </span>
+                                                )}
+                                            </label>
+                                            <select
+                                                value={selectedSubCategory}
+                                                onChange={(e) => handleSubCategoryChange(e.target.value)}
+                                                className={`w-full p-3 border rounded-md ${
+                                                    fieldErrors.subCategory ? 'border-red-500' : 'border-gray-300'
+                                                }`}
+                                                disabled={!selectedCategory || categoriesLoading}
+                                            >
+                                                <option value="">Select a sub-category...</option>
+                                                {subCategoriesForSelectedCategory && Array.isArray(subCategoriesForSelectedCategory) ? subCategoriesForSelectedCategory.filter(sub => sub && typeof sub === 'object').map(sub => (
+                                                    <option key={sub.subCategoryId || sub.id} value={sub.subCategoryId || sub.id}>
+                                                        {sub.name}
+                                                    </option>
+                                                )) : []}
+                                            </select>
+
+                                            {fieldErrors.subCategory && (
+                                                <p className="text-red-600 text-sm mt-1">{fieldErrors.subCategory}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
+                                            <span className="text-sm text-gray-500">
+                                                {fields.length}/15 fields
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={addField}
+                                            disabled={fields.length >= 15}
+                                            className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all duration-150 ${
+                                                fields.length >= 15
+                                                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                            }`}
+                                        >
+                                            <FaPlus /> Add Field
+                                        </button>
+                                    </div>
+
+                                    {fields.length === 0 && (
+                                        <div className="text-center py-8 text-red-500 border-2 border-dashed border-red-300 rounded-lg bg-red-50">
+                                            <div className="text-4xl mb-2">⚠️</div>
+                                            <p className="font-medium">No fields added yet</p>
+                                            <p className="text-sm mt-1">Click &quot;Add Field&quot; to add at least one field before saving</p>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-4">
+                                        {fields.map((field, index) => (
+                                            <div key={field.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <h5 className="font-medium text-gray-800">Field {index + 1}</h5>
+                                                    <button
+                                                        onClick={() => removeField(field.id)}
+                                                        className="text-red-500 hover:text-red-700"
+                                                    >
+                                                        <FaTrash />
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {/* Field Name */}
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                            Field Name (Label)
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={field.name}
+                                                            onChange={(e) => updateField(field.id, 'name', e.target.value)}
+                                                            placeholder="e.g., Asset Name, Employee ID"
+                                                            className="w-full p-2 border border-gray-300 rounded-md"
+                                                        />
+                                                    </div>
+
+                                                    {/* Field Type */}
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                            Field Type
+                                                        </label>
+                                                        <select
+                                                            value={field.type}
+                                                            onChange={(e) => updateField(field.id, 'type', e.target.value)}
+                                                            className="w-full p-2 border border-gray-300 rounded-md"
+                                                        >
+                                                            <option value="text">Text</option>
+                                                            <option value="number">Number</option>
+                                                            <option value="date">Date</option>
+                                                            <option value="file">File Upload</option>
+                                                            <option value="dropdown">Dropdown</option>
+                                                            <option value="checkbox">Checkbox</option>
+                                                            <option value="textarea">Textarea</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {/* Field-specific options */}
+                                                <div className="mt-3">
+                                                    {renderFieldInput(field)}
+                                                </div>
+
+                                                {/* Required toggle */}
+                                                <div className="mt-3">
+                                                    <label className="flex items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={field.required}
+                                                            onChange={(e) => updateField(field.id, 'required', e.target.checked)}
+                                                            className="rounded border-gray-300"
+                                                        />
+                                                        <span className="text-sm font-medium text-gray-700">Required field</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Save Button */}
-                            <div className="pt-4">
+                            {/* Save Button - Fixed at bottom */}
+                            <div className="pt-4 mt-4 border-t border-gray-200">
                                 <button
                                     onClick={handleSaveForm}
-                                    disabled={loading || !formName.trim() || !selectedCategory || fields.length === 0}
-                                    className="w-full px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                                    disabled={formLoading || !formName.trim() || !selectedCategory || fields.length === 0}
+                                    className="w-full px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 cursor-not-allowed font-medium"
                                 >
-                                    {loading ? 'Saving...' : '💾 Update Form'}
+                                    {formLoading ? 'Saving...' : 'Update Form'}
                                 </button>
-                                {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
                             </div>
                         </div>
 
                         {/* Preview Section */}
-                        <div className="lg:border-l lg:pl-8">
-                            {renderFormPreview()}
+                        <div className="bg-white rounded-lg border border-gray-200 p-6 overflow-hidden flex flex-col">
+                            <div className="flex-1 overflow-y-auto pr-2">
+                                {renderFormPreview()}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2713,7 +2817,7 @@ const AssetSettingsPage = () => {
     // Enhanced Redux state selectors
     const { 
         categories, 
-        loading, 
+        loading: categoriesLoading, 
         error, 
         addingSubCategory, 
         updatingSubCategory, 
@@ -2757,6 +2861,64 @@ const AssetSettingsPage = () => {
     } = useSelector(state => state.customForm);
     
     const [activeTab, setActiveTab] = useState('categories');
+    
+    // Custom Form Builder state variables moved to parent component
+    const [view, setView] = useState('list'); // 'list', 'create', 'edit'
+    const [editingFormId, setEditingFormId] = useState(null);
+    const [formName, setFormName] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [selectedSubCategory, setSelectedSubCategory] = useState('');
+    const [fields, setFields] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    
+    // Error state variables
+    const [formError, setFormError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({
+        formName: '',
+        category: '',
+        subCategory: '',
+        fields: []
+    });
+    
+    // Subcategory input state
+    const [newSubCatFieldsByCategory, setNewSubCatFieldsByCategory] = useState({});
+    
+    // Loading state for form operations
+    const [formLoading, setFormLoading] = useState(false);
+    
+    // Function to clear all error states when switching tabs
+    const handleTabChange = (newTabId) => {
+        // Clear all error states when switching tabs
+        setFormError('');
+        setFieldErrors({
+            formName: '',
+            category: '',
+            subCategory: '',
+            fields: []
+        });
+        
+        // Clear form-specific states if switching away from custom form builder
+        if (activeTab === 'customFields' && newTabId !== 'customFields') {
+            setView('list');
+            setEditingFormId(null);
+            setFormName('');
+            setSelectedCategory('');
+            setSelectedSubCategory('');
+            setFields([]);
+            dispatch(clearCurrentForm());
+        }
+        
+        // Clear all input error states when switching tabs
+        setNewCategory({ name: '', showError: false });
+        setNewLocation({ name: '', address: '', showError: false });
+        setNewStatus({ name: '', showError: false });
+        
+        // Clear subcategory input error states
+        setNewSubCatFieldsByCategory({});
+        
+        setActiveTab(newTabId);
+    };
     
     // Fetch assets when component mounts for status deletion validation
     useEffect(() => {
@@ -2841,6 +3003,54 @@ const AssetSettingsPage = () => {
         }
         dispatch(fetchIdFormattings());
     }, [dispatch]);
+
+    // Cleanup effect to clear errors when component unmounts or tab changes
+    useEffect(() => {
+        return () => {
+            // Clear all error states when component unmounts
+            setFormError('');
+            setFieldErrors({
+                formName: '',
+                category: '',
+                subCategory: '',
+                fields: []
+            });
+            // Also clear form states when component unmounts
+            setView('list');
+            setEditingFormId(null);
+            setFormName('');
+            setSelectedCategory('');
+            setSelectedSubCategory('');
+            setFields([]);
+            dispatch(clearCurrentForm());
+        };
+    }, [dispatch, setFormError, setFieldErrors, setView, setEditingFormId, setFormName, setSelectedCategory, setSelectedSubCategory, setFields, setFormLoading]);
+    
+    // Clear error states when switching away from custom form builder tab
+    useEffect(() => {
+        if (activeTab !== 'customFields') {
+            setFormError('');
+            setFieldErrors({
+                formName: '',
+                category: '',
+                subCategory: '',
+                fields: []
+            });
+            // Also clear form states when switching away
+            if (view !== 'list') {
+                setView('list');
+                setEditingFormId(null);
+                setFormName('');
+                setSelectedCategory('');
+                setSelectedSubCategory('');
+                setFields([]);
+                dispatch(clearCurrentForm());
+            }
+            // Clear search term when switching away
+            setSearchTerm('');
+            setDebouncedSearchTerm('');
+        }
+    }, [activeTab, view, dispatch, setFormError, setFieldErrors, setView, setEditingFormId, setFormName, setSelectedCategory, setSelectedSubCategory, setFields, setSearchTerm, setDebouncedSearchTerm, setFormLoading]);
 
     useEffect(() => {
         console.log('Categories updated in component:', categories);
@@ -3715,24 +3925,25 @@ const AssetSettingsPage = () => {
         }
     };
 
-    const handleFetchCustomFormById = async (formId) => {
-        console.log('Fetching custom form by ID:', formId);
-        try {
-            const result = await dispatch(fetchCustomFormById(formId)).unwrap();
-            console.log('Fetched custom form:', result);
-            toast.success("Custom form loaded successfully!");
-            return result;
-        } catch (error) {
-            console.error('Error fetching custom form:', error);
-            toast.error("Failed to load custom form");
-            return null;
-        }
-    };
+    // TODO: Implement fetchCustomFormById in customFormSlice
+    // const handleFetchCustomFormById = async (formId) => {
+    //     console.log('Fetching custom form by ID:', formId);
+    //     try {
+    //         const result = await dispatch(fetchCustomFormById(formId)).unwrap();
+    //         console.log('Fetched custom form:', result);
+    //         toast.success("Custom form loaded successfully!");
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error fetching custom form:', error);
+    //         toast.error("Failed to load custom form");
+    //         return null;
+    //     }
+    // };
 
     const handleCreateCustomForm = async (formDTO) => {
         console.log('Creating custom form:', formDTO);
         try {
-            const result = await dispatch(createCustomFormNew(formDTO)).unwrap();
+            const result = await dispatch(createCustomForm(formDTO)).unwrap();
             console.log('Created custom form:', result);
             toast.success("Custom form created successfully!");
             return result;
@@ -3746,7 +3957,7 @@ const AssetSettingsPage = () => {
     const handleUpdateCustomForm = async (formId, formDTO) => {
         console.log('Updating custom form:', formId, formDTO);
         try {
-            const result = await dispatch(updateCustomFormNew({ formId, formDTO })).unwrap();
+            const result = await dispatch(updateCustomForm({ formId, formDTO })).unwrap();
             console.log('Updated custom form:', result);
             toast.success("Custom form updated successfully!");
             return result;
@@ -3760,7 +3971,7 @@ const AssetSettingsPage = () => {
     const handleDeleteCustomForm = async (formId) => {
         console.log('Deleting custom form:', formId);
         try {
-            const result = await dispatch(deleteCustomFormNew(formId)).unwrap();
+            const result = await dispatch(deleteCustomForm(formId)).unwrap();
             console.log('Deleted custom form:', result);
             toast.success("Custom form deleted successfully!");
             return result;
@@ -3785,75 +3996,80 @@ const AssetSettingsPage = () => {
         }
     };
 
-    const handleAddFieldToForm = async (formId, fieldDTO) => {
-        console.log('Adding field to form:', formId, fieldDTO);
-        try {
-            const result = await dispatch(addFieldToForm({ formId, fieldDTO })).unwrap();
-            console.log('Added field to form:', result);
-            toast.success("Field added to form successfully!");
-            return result;
-        } catch (error) {
-            console.error('Error adding field to form:', error);
-            toast.error("Failed to add field to form");
-            return null;
-        }
-    };
+    // TODO: Implement addFieldToForm in customFormSlice
+    // const handleAddFieldToForm = async (formId, fieldDTO) => {
+    //     console.log('Adding field to form:', formId, fieldDTO);
+    //     try {
+    //         const result = await dispatch(addFieldToForm({ formId, fieldDTO })).unwrap();
+    //         console.log('Added field to form:', result);
+    //         toast.success("Field added to form successfully!");
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error adding field to form:', error);
+    //         toast.error("Failed to add field to form");
+    //         return null;
+    //     }
+    // };
 
-    const handleUpdateFormField = async (formId, fieldId, fieldDTO) => {
-        console.log('Updating form field:', formId, fieldId, fieldDTO);
-        try {
-            const result = await dispatch(updateField({ formId, fieldId, fieldDTO })).unwrap();
-            console.log('Updated form field:', result);
-            toast.success("Form field updated successfully!");
-            return result;
-        } catch (error) {
-            console.error('Error updating form field:', error);
-            toast.error("Failed to update form field");
-            return null;
-        }
-    };
+    // TODO: Implement updateField in customFormSlice
+    // const handleUpdateFormField = async (formId, fieldId, fieldDTO) => {
+    //     console.log('Updating form field:', formId, fieldId, fieldDTO);
+    //     try {
+    //         const result = await dispatch(updateField({ formId, fieldId, fieldDTO })).unwrap();
+    //         console.log('Updated form field:', result);
+    //         toast.success("Form field updated successfully!");
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error updating form field:', error);
+    //         toast.error("Failed to update form field");
+    //         return null;
+    //     }
+    // };
 
-    const handleDeleteFormField = async (formId, fieldId) => {
-        console.log('Deleting form field:', formId, fieldId);
-        try {
-            const result = await dispatch(deleteField({ formId, fieldId })).unwrap();
-            console.log('Deleted form field:', result);
-            toast.success("Form field deleted successfully!");
-            return result;
-        } catch (error) {
-            console.error('Error deleting form field:', error);
-            toast.error("Failed to delete form field");
-            return null;
-        }
-    };
+    // TODO: Implement deleteField in customFormSlice
+    // const handleDeleteFormField = async (formId, fieldId) => {
+    //     console.log('Deleting form field:', formId, fieldId);
+    //     try {
+    //         const result = await dispatch(deleteField({ formId, fieldId })).unwrap();
+    //         console.log('Deleted form field:', result);
+    //         toast.success("Form field deleted successfully!");
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error deleting form field:', error);
+    //         toast.error("Failed to delete form field");
+    //         return null;
+    //     }
+    // };
 
-    const handleAssignFormToCategory = async (formId, categoryId) => {
-        console.log('Assigning form to category:', formId, categoryId);
-        try {
-            const result = await dispatch(assignFormToCategory({ formId, categoryId })).unwrap();
-            console.log('Assigned form to category:', result);
-            toast.success("Form assigned to category successfully!");
-            return result;
-        } catch (error) {
-            console.error('Error assigning form to category:', error);
-            toast.error("Failed to assign form to category");
-            return null;
-        }
-    };
+    // TODO: Implement assignFormToCategory in customFormSlice
+    // const handleAssignFormToCategory = async (formId, categoryId) => {
+    //     console.log('Assigning form to category:', formId, categoryId);
+    //     try {
+    //         const result = await dispatch(assignFormToCategory({ formId, categoryId })).unwrap();
+    //         console.log('Assigned form to category:', result);
+    //         toast.success("Form assigned to category successfully!");
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error assigning form to category:', error);
+    //         toast.error("Failed to assign form to category");
+    //         return null;
+    //     }
+    // };
 
-    const handleUnassignFormFromCategory = async (formId) => {
-        console.log('Unassigning form from category:', formId);
-        try {
-            const result = await dispatch(unassignFormFromCategory(formId)).unwrap();
-            console.log('Unassigned form from category:', result);
-            toast.success("Form unassigned from category successfully!");
-            return result;
-        } catch (error) {
-            console.error('Error unassigning form from category:', error);
-            toast.error("Failed to unassign form from category");
-            return null;
-        }
-    };
+    // TODO: Implement unassignFormFromCategory in customFormSlice
+    // const handleUnassignFormFromCategory = async (formId) => {
+    //     console.log('Unassigning form from category:', formId);
+    //     try {
+    //         const result = await dispatch(unassignFormFromCategory(formId)).unwrap();
+    //         console.log('Unassigned form from category:', result);
+    //         toast.success("Form unassigned from category successfully!");
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error unassigning form from category:', error);
+    //         toast.error("Failed to unassign form from category");
+    //         return null;
+    //     }
+    // };
 
     /**
      * Fetch forms by category or subcategory
@@ -3894,11 +4110,16 @@ const AssetSettingsPage = () => {
                 return formsForSubcategory;
             }
             
+            // TODO: Implement fetchFormsByCategory in customFormSlice
             // If it's a regular category ID, use the existing endpoint
-            const result = await dispatch(fetchFormsByCategory(categoryId)).unwrap();
-            console.log('Fetched forms by category:', result);
-            toast.success(`Loaded ${result.length || 0} forms for category successfully!`);
-            return result;
+            // const result = await dispatch(fetchFormsByCategory(categoryId)).unwrap();
+            // console.log('Fetched forms by category:', result);
+            // toast.success(`Loaded ${result.length || 0} forms for category successfully!`);
+            // return result;
+            
+            // For now, return empty array since the function is not implemented
+            console.warn('fetchFormsByCategory not implemented, returning empty array');
+            return [];
         } catch (error) {
             console.error('Error fetching forms by category:', error);
             toast.error("Failed to load forms for category");
@@ -3906,38 +4127,40 @@ const AssetSettingsPage = () => {
         }
     };
 
-    const handlePreviewForm = async (formId) => {
-        console.log('Previewing form:', formId);
-        try {
-            const result = await dispatch(previewForm(formId)).unwrap();
-            console.log('Form preview:', result);
-            toast.success("Form preview loaded successfully!");
-            return result;
-        } catch (error) {
-            console.error('Error previewing form:', error);
-            toast.error("Failed to preview form");
-            return null;
-        }
-    };
+    // TODO: Implement previewForm in customFormSlice
+    // const handlePreviewForm = async (formId) => {
+    //     console.log('Previewing form:', formId);
+    //     try {
+    //         const result = await dispatch(previewForm(formId)).unwrap();
+    //         console.log('Form preview:', result);
+    //         toast.success("Form preview loaded successfully!");
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error previewing form:', error);
+    //         toast.error("Failed to preview form");
+    //         return null;
+    //     }
+    // };
 
-    const handleDuplicateForm = async (formId) => {
-        console.log('Duplicating form:', formId);
-        try {
-            const result = await dispatch(duplicateForm(formId)).unwrap();
-            console.log('Duplicated form:', result);
-            toast.success("Form duplicated successfully!");
-            return result;
-        } catch (error) {
-            console.error('Error duplicating form:', error);
-            toast.error("Failed to duplicate form");
-            return null;
-        }
-    };
+    // TODO: Implement duplicateForm in customFormSlice
+    // const handleDuplicateForm = async (formId) => {
+    //     console.log('Duplicating form:', formId);
+    //     try {
+    //         const result = await dispatch(duplicateForm(formId)).unwrap();
+    //         console.log('Duplicated form:', result);
+    //         toast.success("Form duplicated successfully!");
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error duplicating form:', error);
+    //         toast.error("Failed to duplicate form");
+    //         return null;
+    //     }
+    // };
 
     const handleToggleFormStatus = async (formId) => {
         console.log('Toggling form status:', formId);
         try {
-            const result = await dispatch(toggleFormStatusNew(formId)).unwrap();
+            const result = await dispatch(toggleFormStatus(formId)).unwrap();
             console.log('Toggled form status:', result);
             toast.success("Form status updated successfully!");
             return result;
@@ -3948,61 +4171,65 @@ const AssetSettingsPage = () => {
         }
     };
 
-    const handleSubmitFormData = async (formId, assetId, createdBy, fieldData, files = {}) => {
-        console.log('Submitting form data:', { formId, assetId, createdBy, fieldData, files });
-        try {
-            const result = await dispatch(submitFormData({ formId, assetId, createdBy, fieldData, files })).unwrap();
-            console.log('Submitted form data:', result);
-            toast.success("Form data submitted successfully!");
-            return result;
-        } catch (error) {
-            console.error('Error submitting form data:', error);
-            toast.error("Failed to submit form data");
-            return null;
-        }
-    };
+    // TODO: Implement submitFormData in customFormSlice
+    // const handleSubmitFormData = async (formId, assetId, createdBy, fieldData, files = {}) => {
+    //     console.log('Submitting form data:', { formId, assetId, createdBy, fieldData, files });
+    //     try {
+    //         const result = await dispatch(submitFormData({ formId, assetId, createdBy, fieldData, files })).unwrap();
+    //         console.log('Submitted form data:', result);
+    //         toast.success("Form data submitted successfully!");
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error submitting form data:', error);
+    //         toast.error("Failed to submit form data");
+    //         return null;
+    //     }
+    // };
 
-    const handleFetchFormDataForAsset = async (formId, assetId) => {
-        console.log('Fetching form data for asset:', { formId, assetId });
-        try {
-            const result = await dispatch(fetchFormDataForAsset({ formId, assetId })).unwrap();
-            console.log('Fetched form data for asset:', result);
-            toast.success("Form data loaded successfully!");
-            return result;
-        } catch (error) {
-            console.error('Error fetching form data for asset:', error);
-            toast.error("Failed to load form data");
-            return null;
-        }
-    };
+    // TODO: Implement fetchFormDataForAsset in customFormSlice
+    // const handleFetchFormDataForAsset = async (formId, assetId) => {
+    //     console.log('Fetching form data for asset:', { formId, assetId });
+    //     try {
+    //         const result = await dispatch(fetchFormDataForAsset({ formId, assetId })).unwrap();
+    //         console.log('Fetched form data for asset:', result);
+    //         toast.success("Form data loaded successfully!");
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error fetching form data for asset:', error);
+    //         toast.error("Failed to load form data");
+    //         return null;
+    //     }
+    // };
 
-    const handleFetchAllFormDataForAsset = async (assetId) => {
-        console.log('Fetching all form data for asset:', assetId);
-        try {
-            const result = await dispatch(fetchAllFormDataForAsset(assetId)).unwrap();
-            console.log('Fetched all form data for asset:', result);
-            toast.success(`Loaded ${result.length || 0} form data records successfully!`);
-            return result;
-        } catch (error) {
-            console.error('Error fetching all form data for asset:', error);
-            toast.error("Failed to load form data");
-            return [];
-        }
-    };
+    // TODO: Implement fetchAllFormDataForAsset in customFormSlice
+    // const handleFetchAllFormDataForAsset = async (assetId) => {
+    //     console.log('Fetching all form data for asset:', assetId);
+    //     try {
+    //         const result = await dispatch(fetchAllFormDataForAsset(assetId)).unwrap();
+    //         console.log('Fetched all form data for asset:', result);
+    //         toast.success(`Loaded ${result.length || 0} form data records successfully!`);
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error fetching all form data for asset:', error);
+    //         toast.error("Failed to load form data");
+    //         return [];
+    //     }
+    // };
 
-    const handleDeleteFormData = async (dataId) => {
-        console.log('Deleting form data:', dataId);
-        try {
-            const result = await dispatch(deleteFormData(dataId)).unwrap();
-            console.log('Deleted form data:', result);
-            toast.success("Form data deleted successfully!");
-            return result;
-        } catch (error) {
-            console.error('Error deleting form data:', error);
-            toast.error("Failed to delete form data");
-            return null;
-        }
-    };
+    // TODO: Implement deleteFormData in customFormSlice
+    // const handleDeleteFormData = async (dataId) => {
+    //     console.log('Deleting form data:', dataId);
+    //     try {
+    //         const result = await dispatch(deleteFormData(dataId)).unwrap();
+    //         console.log('Deleted form data:', result);
+    //         toast.success("Form data deleted successfully!");
+    //         return result;
+    //     } catch (error) {
+    //         console.error('Error deleting form data:', error);
+    //         toast.error("Failed to delete form data");
+    //         return null;
+    //     }
+    // };
 
     // Location management functions
     const handleAddLocation = async () => {
@@ -4890,7 +5117,7 @@ const AssetSettingsPage = () => {
                 setNewCategory={setNewCategory} 
                 onAdd={handleAddCategory} 
                 onFieldChange={handleCategoryFieldChange} 
-                loading={loading} 
+                loading={categoriesLoading} 
                 onDelete={handleDeleteCategory}
                 onSave={handleSaveCategories}
                 onCancel={handleCancelCategories}
@@ -4906,6 +5133,9 @@ const AssetSettingsPage = () => {
                 onDeleteIdFormat={handleDeleteIdFormat}
                 onSaveIdFormat={handleSaveIdFormat}
                 onCancelIdFormat={handleCancelIdFormat}
+                activeTab={activeTab}
+                newSubCatFieldsByCategory={newSubCatFieldsByCategory}
+                setNewSubCatFieldsByCategory={setNewSubCatFieldsByCategory}
             /> 
         },
         { 
@@ -4928,6 +5158,7 @@ const AssetSettingsPage = () => {
                 onDelete={handleDeleteLocation}
                 onSave={handleSaveLocations}
                 onCancel={handleCancelLocations}
+                activeTab={activeTab}
             /> 
         },
         { 
@@ -4950,6 +5181,7 @@ const AssetSettingsPage = () => {
                 onDelete={handleDeleteStatus}
                 onSave={handleSaveStatuses}
                 onCancel={handleCancelStatuses}
+                activeTab={activeTab}
             /> 
         },
         { 
@@ -4963,6 +5195,29 @@ const AssetSettingsPage = () => {
             component: <CustomFormBuilder 
                 editing={editingCustomFields} 
                 onDeleteForm={handleDeleteForm}
+                activeTab={activeTab}
+                view={view}
+                setView={setView}
+                editingFormId={editingFormId}
+                setEditingFormId={setEditingFormId}
+                formName={formName}
+                setFormName={setFormName}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                selectedSubCategory={selectedSubCategory}
+                setSelectedSubCategory={setSelectedSubCategory}
+                fields={fields}
+                setFields={setFields}
+                formError={formError}
+                setFormError={setFormError}
+                fieldErrors={fieldErrors}
+                setFieldErrors={setFieldErrors}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                debouncedSearchTerm={debouncedSearchTerm}
+                setDebouncedSearchTerm={setDebouncedSearchTerm}
+                formLoading={formLoading}
+                setFormLoading={setFormLoading}
             /> 
         },
     ];
@@ -5033,7 +5288,7 @@ const AssetSettingsPage = () => {
                         {settingsTabs.map(tab => (
                             <button
                                 key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
+                                onClick={() => handleTabChange(tab.id)}
                                 className={`flex items-center gap-3 px-6 py-4 whitespace-nowrap transition-colors border-b-2 ${
                                     activeTab === tab.id
                                         ? 'border-blue-500 text-blue-600 bg-blue-50'

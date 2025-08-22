@@ -9,7 +9,7 @@ import { fetchAssetCategories } from '@/redux/slices/assetCategorySlice';
 import { fetchAssetLocations } from '@/redux/slices/assetLocationSlice';
 import { fetchAssetStatuses } from '@/redux/slices/assetStatusSlice';
 import { createAssetWithDTO, fetchAllAssets, patchAssetByAssetId } from '@/redux/slices/assetSlice';
-import { fetchCustomForms, fetchCustomFormsByCategory } from '@/redux/slices/customFormSlice';
+import { fetchCustomForms, fetchCustomFormsBySubCategory } from '@/redux/slices/customFormSlice';
 
 import getConfig from 'next/config';
 import { getItemFromSessionStorage } from '@/redux/slices/sessionStorageSlice';
@@ -296,8 +296,9 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
     const { statuses, loading: statusesLoading, error: statusesError } = useSelector(state => state.assetStatuses);
     const { creatingAsset, error: assetError } = useSelector(state => state.assets);
     const { forms, loading: customFormsLoading } = useSelector(state => state.customForm);
+    const { formsBySubCategory } = useSelector(state => state.customForm);
     
-    // More robust fallback forms access - use formsByCategory if available
+    // More robust fallback forms access - use formsBySubCategory if available
     const safeFallbackForms = Array.isArray(forms) ? forms : [];
     
     const [formData, setFormData] = useState({
@@ -326,48 +327,24 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
 
     // Get custom forms for the selected category and subcategory
     const customForms = React.useMemo(() => {
-        if (!selectedCategoryData || !selectedSubcategoryId) return [];
+        if (!selectedSubcategoryId) return [];
         
         try {
-            // Filter forms by subcategory from the category-specific forms
-            if (Array.isArray(safeFallbackForms)) {
-                const filteredForms = safeFallbackForms.filter(form => {
-                    // Try multiple possible field names for subcategory ID
-                    const formSubcategoryId = form?.subCategoryId || 
-                                            form?.subcategoryId || 
-                                            form?.assignedSubCategoryId || 
-                                            form?.subCategory?.id || 
-                                            form?.subcategory?.id;
-                    
-                    // Get the selected subcategory ID
-                    const selectedSubcategoryIdStr = String(selectedSubcategoryId).trim();
-                    
-                    // Log the comparison for debugging
-                    console.log('Form filtering by subcategory:', {
-                        formId: form?.id,
-                        formName: form?.name,
-                        formSubcategoryId,
-                        selectedSubcategoryId: selectedSubcategoryIdStr,
-                        subcategoryMatch: formSubcategoryId != null && String(formSubcategoryId).trim() === selectedSubcategoryIdStr
-                    });
-                    
-                    // Check if subcategory matches (convert both to strings for comparison)
-                    const subcategoryMatches = formSubcategoryId != null && 
-                                            String(formSubcategoryId).trim() === selectedSubcategoryIdStr;
-                    
-                    return subcategoryMatches;
-                });
-                
-                console.log('Filtered forms result:', filteredForms);
-                return filteredForms;
-            }
+            // Get forms for this specific subcategory from Redux state
+            const formsForSubcategory = formsBySubCategory[selectedSubcategoryId] || [];
             
-            return [];
+            console.log('Custom forms for subcategory:', {
+                subcategoryId: selectedSubcategoryId,
+                formsFound: formsForSubcategory.length,
+                forms: formsForSubcategory
+            });
+            
+            return formsForSubcategory;
         } catch (error) {
             console.error('Error getting custom forms:', error);
             return [];
         }
-    }, [selectedSubcategoryId, safeFallbackForms]);
+    }, [selectedSubcategoryId, formsBySubCategory]);
 
 
 
@@ -417,15 +394,28 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
     // Fetch forms only after a subcategory is chosen (per requirement)
     useEffect(() => {
         if (!selectedSubcategoryId || !selectedCategoryData) return;
-        const categoryId = selectedCategoryData.categoryId || selectedCategoryData.id;
-        if (!categoryId) return;
-        console.log('Fetching custom forms for category after subcategory selection:', {
-            categoryId,
-            selectedSubcategoryId,
+        
+        // Get company ID from session storage
+        const companyId = sessionStorage.getItem("employeeCompanyId") || 
+                         sessionStorage.getItem("companyId") || 
+                         sessionStorage.getItem("company");
+        
+        if (!companyId) {
+            console.warn('Company ID not found in session storage');
+            return;
+        }
+        
+        console.log('Fetching custom forms for subcategory:', {
+            subcategoryId: selectedSubcategoryId,
+            companyId: companyId,
             selectedCategoryData
         });
-        // Use fetchCustomFormsByCategory to get forms for the specific category
-        dispatch(fetchCustomFormsByCategory(categoryId));
+        
+        // Use fetchCustomFormsBySubCategory to get forms for the specific subcategory
+        dispatch(fetchCustomFormsBySubCategory({ 
+            subCategoryId: selectedSubcategoryId, 
+            companyId: companyId 
+        }));
     }, [selectedSubcategoryId, selectedCategoryData, dispatch]);
 
     // Debug logging for forms loading
@@ -433,13 +423,14 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
         console.log('Forms state changed:', {
             forms: safeFallbackForms,
             formsLength: safeFallbackForms?.length || 0,
+            formsBySubCategory: formsBySubCategory,
             customForms: customForms,
             customFormsLength: customForms?.length || 0,
             selectedCategoryData,
             selectedSubcategoryId,
             loading: customFormsLoading
         });
-    }, [safeFallbackForms, customForms, selectedCategoryData, selectedSubcategoryId, customFormsLoading]);
+    }, [safeFallbackForms, formsBySubCategory, customForms, selectedCategoryData, selectedSubcategoryId, customFormsLoading]);
 
     // Clear custom form data when subcategory changes
     useEffect(() => {
@@ -453,7 +444,7 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
         if (formData.category) {
             setCustomFormData({});
         }
-    }, [formData.category]);
+    }, [formData.category, formData.subcategory]);
 
     // Generate asset ID by querying backend for the next ID when subcategory is selected
     useEffect(() => {

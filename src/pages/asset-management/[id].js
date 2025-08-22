@@ -229,7 +229,7 @@ const AssetDetailPage = () => {
         if (activeTab !== 'documents' && isDocumentModalOpen) {
             setIsDocumentModalOpen(false);
         }
-    }, [activeTab]);
+    }, [activeTab, isDocumentModalOpen]);
     
     // Get data from Redux store
     const { currentAsset: asset, loading: fetchingAsset, error: fetchAssetError, updatingAsset, updateAssetError } = useSelector(state => state.assets);
@@ -264,7 +264,7 @@ const AssetDetailPage = () => {
         if (!employees || employees.length === 0) {
             dispatch(fetchEmployees());
         }
-    }, [dispatch]);
+    }, [dispatch, departments, employees]);
     
     // Fetch reference data when asset is loaded and we need to display names
     useEffect(() => {

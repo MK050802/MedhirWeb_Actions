@@ -1455,6 +1455,9 @@ function PayrollManagement() {
         toast.success(`Pay Structure settings ${
           isEditingPayStructure ? "updated" : "created"
         } successfully!`);
+        
+        // Refresh the page to show changes immediately
+        window.location.reload();
       } else {
         throw new Error(resultAction.error.message);
       }

@@ -10,7 +10,9 @@ export const fetchCustomers = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = getItemFromSessionStorage("token", null);
-      const response = await fetch(`${API_BASE_URL}`, {
+      const companyId = sessionStorage.getItem("employeeCompanyId");
+      
+      const response = await fetch(`${API_BASE_URL}?companyId=${companyId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -33,13 +35,20 @@ export const addCustomer = createAsyncThunk(
   async (customer, { rejectWithValue }) => {
     try {
       const token = getItemFromSessionStorage("token", null);
+      const companyId = sessionStorage.getItem("employeeCompanyId");
+      
+      const customerWithCompany = {
+        ...customer,
+        companyId: companyId
+      };
+      
       const response = await fetch(`${API_BASE_URL}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(customer),
+        body: JSON.stringify(customerWithCompany),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -58,13 +67,20 @@ export const updateCustomer = createAsyncThunk(
   async (customer, { rejectWithValue }) => {
     try {
       const token = getItemFromSessionStorage("token", null);
+      const companyId = sessionStorage.getItem("employeeCompanyId");
+      
+      const customerWithCompany = {
+        ...customer,
+        companyId: companyId
+      };
+      
       const response = await fetch(`${API_BASE_URL}/${customer.customerId}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(customer),
+        body: JSON.stringify(customerWithCompany),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -83,7 +99,9 @@ export const getCustomerById = createAsyncThunk(
   async (customerId, { rejectWithValue }) => {
     try {
       const token = getItemFromSessionStorage("token", null);
-      const response = await fetch(`${API_BASE_URL}/${customerId}`, {
+      const companyId = sessionStorage.getItem("employeeCompanyId");
+      
+      const response = await fetch(`${API_BASE_URL}/${customerId}?companyId=${companyId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -106,7 +124,9 @@ export const searchCustomersByName = createAsyncThunk(
   async (customerName, { rejectWithValue }) => {
     try {
       const token = getItemFromSessionStorage("token", null);
-      const response = await fetch(`${API_BASE_URL}/search/name?customerName=${encodeURIComponent(customerName)}`, {
+      const companyId = sessionStorage.getItem("employeeCompanyId");
+      
+      const response = await fetch(`${API_BASE_URL}/search/name?customerName=${encodeURIComponent(customerName)}&companyId=${companyId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -129,7 +149,9 @@ export const searchCustomersByEmail = createAsyncThunk(
   async (email, { rejectWithValue }) => {
     try {
       const token = getItemFromSessionStorage("token", null);
-      const response = await fetch(`${API_BASE_URL}/search/email?email=${encodeURIComponent(email)}`, {
+      const companyId = sessionStorage.getItem("employeeCompanyId");
+      
+      const response = await fetch(`${API_BASE_URL}/search/email?email=${encodeURIComponent(email)}&companyId=${companyId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -152,7 +174,9 @@ export const getCustomerByEmail = createAsyncThunk(
   async (email, { rejectWithValue }) => {
     try {
       const token = getItemFromSessionStorage("token", null);
-      const response = await fetch(`${API_BASE_URL}/email/${encodeURIComponent(email)}`, {
+      const companyId = sessionStorage.getItem("employeeCompanyId");
+      
+      const response = await fetch(`${API_BASE_URL}/email/${encodeURIComponent(email)}?companyId=${companyId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -175,7 +199,9 @@ export const customerExistsByEmail = createAsyncThunk(
   async (email, { rejectWithValue }) => {
     try {
       const token = getItemFromSessionStorage("token", null);
-      const response = await fetch(`${API_BASE_URL}/exists/email/${encodeURIComponent(email)}`, {
+      const companyId = sessionStorage.getItem("employeeCompanyId");
+      
+      const response = await fetch(`${API_BASE_URL}/exists/email/${encodeURIComponent(email)}?companyId=${companyId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -198,7 +224,9 @@ export const getCustomersByLeadId = createAsyncThunk(
   async (leadId, { rejectWithValue }) => {
     try {
       const token = getItemFromSessionStorage("token", null);
-      const response = await fetch(`${API_BASE_URL}/lead/${leadId}`, {
+      const companyId = sessionStorage.getItem("employeeCompanyId");
+      
+      const response = await fetch(`${API_BASE_URL}/lead/${leadId}?companyId=${companyId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

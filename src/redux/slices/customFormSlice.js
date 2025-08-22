@@ -13,9 +13,9 @@ const API_BASE = publicRuntimeConfig.apiURL + "/api/asset-settings/custom-forms"
  *    - Fetch all custom forms (with optional category filter)
  *    - Used by: fetchCustomForms()
  * 
- * 2. GET /api/asset-settings/custom-forms/category/{categoryId}
- *    - Fetch custom forms by category ID
- *    - Used by: fetchCustomFormsByCategory()
+ * 2. GET /api/asset-settings/custom-forms?subCategoryId={subCategoryId}&companyId={companyId}
+ *    - Fetch custom forms by subcategory ID and company ID
+ *    - Used by: fetchCustomFormsBySubCategory()
  * 
  * 3. GET /api/asset-settings/custom-forms/{formId}/fields
  *    - Fetch form fields for a specific form
@@ -192,21 +192,23 @@ export const fetchCustomForms = createAsyncThunk(
   }
 );
 
-// Fetch custom forms by category
-export const fetchCustomFormsByCategory = createAsyncThunk(
-  'customForms/fetchByCategory',
-  async (categoryId, { rejectWithValue }) => {
+// Fetch custom forms by subcategory
+export const fetchCustomFormsBySubCategory = createAsyncThunk(
+  'customForms/fetchBySubCategory',
+  async ({ subCategoryId, companyId }, { rejectWithValue }) => {
     try {
       const token = getItemFromSessionStorage('token', null);
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       
-      console.log('Fetching custom forms for category:', categoryId);
-      const response = await axios.get(`${API_BASE}/category/${categoryId}`, { 
+      console.log('Fetching custom forms for subcategory:', subCategoryId, 'and company:', companyId);
+      
+      // Use the correct API endpoint with subCategoryId and companyId as query parameters
+      const response = await axios.get(`${API_BASE}?subCategoryId=${subCategoryId}&companyId=${companyId}`, { 
         headers,
         timeout: 10000
       });
       
-      console.log('Custom Forms by Category API Response:', response.data);
+      console.log('Custom Forms by Subcategory API Response:', response.data);
       
       // Handle different response formats
       let forms = [];
@@ -226,10 +228,10 @@ export const fetchCustomFormsByCategory = createAsyncThunk(
         enabled: form.enabled !== undefined ? form.enabled : form.isActive !== undefined ? form.isActive : true
       }));
       
-      return { categoryId, forms: mappedForms };
+      return { subCategoryId, forms: mappedForms };
     } catch (error) {
-      console.error('Redux: Error fetching custom forms by category:', error);
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch custom forms by category');
+      console.error('Redux: Error fetching custom forms by subcategory:', error);
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch custom forms by subcategory');
     }
   }
 );
@@ -563,7 +565,7 @@ const customFormsSlice = createSlice({
     updatingForm: false,
     deletingForm: false,
     error: null,
-    formsByCategory: {}, // New state for forms by category
+    formsBySubCategory: {}, // Updated: Store forms by subcategory instead of category
     fieldsByForm: {} // New state for fields by form
   },
   reducers: {
@@ -601,27 +603,27 @@ const customFormsSlice = createSlice({
         state.error = action.payload || 'Failed to fetch custom forms';
       })
       
-      // Fetch forms by category
-      .addCase(fetchCustomFormsByCategory.pending, (state) => {
+      // Fetch forms by subcategory
+      .addCase(fetchCustomFormsBySubCategory.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchCustomFormsByCategory.fulfilled, (state, action) => {
+      .addCase(fetchCustomFormsBySubCategory.fulfilled, (state, action) => {
         state.loading = false;
-        // Safely extract categoryId and forms from payload
-        const { categoryId, forms } = action.payload || {};
+        // Safely extract subCategoryId and forms from payload
+        const { subCategoryId, forms } = action.payload || {};
         
-        if (categoryId && forms) {
-          // Store forms by category for easy access
-          if (!state.formsByCategory) {
-            state.formsByCategory = {};
+        if (subCategoryId && forms) {
+          // Store forms by subcategory for easy access
+          if (!state.formsBySubCategory) {
+            state.formsBySubCategory = {};
           }
-          state.formsByCategory[categoryId] = forms;
+          state.formsBySubCategory[subCategoryId] = forms;
         }
       })
-      .addCase(fetchCustomFormsByCategory.rejected, (state, action) => {
+      .addCase(fetchCustomFormsBySubCategory.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload || 'Failed to fetch custom forms by category';
+        state.error = action.payload || 'Failed to fetch custom forms by subcategory';
       })
       
       // Create custom form

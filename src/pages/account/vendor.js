@@ -8,7 +8,7 @@ import PurchaseOrderPreview from '../../components/Previews/PurchaseOrderPreview
 import Sidebar from "../../components/Sidebar";
 import HradminNavbar from "../../components/HradminNavbar";
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchVendors } from '../../redux/slices/vendorSlice';
+import { fetchVendors, fetchVendorBills, fetchVendorPayments, fetchVendorPurchaseOrders } from '../../redux/slices/vendorSlice';
 import { fetchBills } from '../../redux/slices/BillSlice';
 import { fetchPayments } from '../../redux/slices/paymentSlice';
 import { fetchPurchaseOrders } from '../../redux/slices/PurchaseOrderSlice';
@@ -69,7 +69,7 @@ const handleDownloadFile = async (url, fileName = null) => {
   }
 };
 
-  const { vendors, loading, error } = useSelector((state) => state.vendors);
+  const { vendors, vendorBills, vendorPayments, vendorPurchaseOrders, loading, error } = useSelector((state) => state.vendors);
   const { bills, loading: billsLoading, error: billsError } = useSelector((state) => state.bills);
   const { payments, loading: paymentsLoading, error: paymentsError } = useSelector((state) => state.payments);
   const { purchaseOrders, loading: purchaseOrdersLoading, error: purchaseOrdersError } = useSelector((state) => state.purchaseOrders);
@@ -429,6 +429,26 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
 
   };
 
+  // Handle vendor row click
+  const handleVendorClick = (vendor) => {
+    setSelectedVendor(vendor);
+    // Fetch vendor-specific data from all three APIs
+    dispatch(fetchVendorBills(vendor.vendorId));
+    dispatch(fetchVendorPayments(vendor.vendorId));
+    dispatch(fetchVendorPurchaseOrders(vendor.vendorId));
+  };
+
+  // Refresh vendor data
+  const refreshVendorData = () => {
+    if (selectedVendor) {
+      Promise.all([
+        dispatch(fetchVendorBills(selectedVendor.vendorId)),
+        dispatch(fetchVendorPayments(selectedVendor.vendorId)),
+        dispatch(fetchVendorPurchaseOrders(selectedVendor.vendorId))
+      ]);
+    }
+  };
+
 
 
   // Add button label
@@ -557,19 +577,19 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
                       (vendor.contactNumber && vendor.contactNumber.toLowerCase().includes(searchTerm.toLowerCase()))
                     )
                     .map((vendor) => {
-                      // Calculate net payables for this vendor
-                      const vendorBills = bills.filter(bill => bill.vendorId === vendor.vendorId);
-                      const vendorPayments = payments.filter(payment => payment.vendorId === vendor.vendorId);
+                      // Calculate net payables for this vendor using vendor-specific data from Redux state
+                      const currentVendorBills = vendorBills[vendor.vendorId] || [];
+                      const currentVendorPayments = vendorPayments[vendor.vendorId] || [];
                       
-                      const totalBills = vendorBills.reduce((sum, bill) => sum + (bill.finalAmount || 0), 0);
-                      const totalPayments = vendorPayments.reduce((sum, payment) => sum + (payment.totalAmount || 0), 0);
+                      const totalBills = currentVendorBills.reduce((sum, bill) => sum + (bill.finalAmount || 0), 0);
+                      const totalPayments = currentVendorPayments.reduce((sum, payment) => sum + (payment.totalAmount || 0), 0);
                       const netPayables = totalBills - totalPayments;
                       
                       return (
                         <tr 
                           key={vendor.id} 
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
-                          onClick={() => setSelectedVendor(vendor)}
+                          onClick={() => handleVendorClick(vendor)}
                         >
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className="text-sm font-medium text-gray-900">{vendor.vendorName}</span>
@@ -608,6 +628,11 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
             <div className="w-3/5 bg-white shadow-sm border border-gray-200">
               {selectedVendor ? (
                 <div className="p-6">
+                  {loading && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <p className="text-sm text-blue-700">Loading vendor details...</p>
+                    </div>
+                  )}
 
 
                   {/* Tab Navigation */}
@@ -661,6 +686,9 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
                     <div>
                       <div className="mb-4">
                         <h3 className="text-lg font-semibold text-gray-900">Vendor Bills</h3>
+                        {loading && (
+                          <p className="text-sm text-blue-600 mt-1">Loading vendor bills...</p>
+                        )}
                       </div>
                       <div className="overflow-x-auto">
                 <table className="min-w-full">
@@ -676,8 +704,12 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                             {(() => {
-                              const vendorBills = bills.filter(bill => bill.vendorId === selectedVendor.vendorId);
-                              return vendorBills.length > 0 ? vendorBills.map((bill) => (
+                              // Use vendorBills from Redux state instead of filtering all bills
+                              const currentVendorBills = selectedVendor && vendorBills[selectedVendor.vendorId] 
+                                ? vendorBills[selectedVendor.vendorId] 
+                                : [];
+                              
+                              return currentVendorBills.length > 0 ? currentVendorBills.map((bill) => (
                     <tr 
                       key={bill.id} 
                                   className="hover:bg-gray-50 cursor-pointer transition-colors"
@@ -726,7 +758,7 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
                               )) : (
                                 <tr>
                                   <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                                    No bills found for this vendor
+                                    {loading ? 'Loading bills...' : 'No bills found for this vendor'}
                                   </td>
                                 </tr>
                               );
@@ -741,6 +773,9 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
             <div>
                       <div className="mb-4">
                         <h3 className="text-lg font-semibold text-gray-900">Purchase Orders</h3>
+                        {loading && (
+                          <p className="text-sm text-blue-600 mt-1">Loading vendor data...</p>
+                        )}
                     </div>
                       <div className="overflow-x-auto">
                   <table className="min-w-full">
@@ -756,8 +791,11 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                             {(() => {
-                              const vendorPOs = purchaseOrders.filter(po => po.vendorId === selectedVendor.vendorId);
-                              return vendorPOs.length > 0 ? vendorPOs.map((po) => (
+                              // Use vendorPurchaseOrders from Redux state instead of filtering all purchase orders
+                              const currentVendorPOs = selectedVendor && vendorPurchaseOrders[selectedVendor.vendorId] 
+                                ? vendorPurchaseOrders[selectedVendor.vendorId] 
+                                : [];
+                              return currentVendorPOs.length > 0 ? currentVendorPOs.map((po) => (
                       <tr 
                         key={po.id} 
                                   className="hover:bg-gray-50 cursor-pointer transition-colors"
@@ -828,6 +866,9 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
           <div>
                       <div className="mb-4">
                         <h3 className="text-lg font-semibold text-gray-900">Vendor Payments</h3>
+                        {loading && (
+                          <p className="text-sm text-blue-600 mt-1">Loading vendor data...</p>
+                        )}
                   </div>
                       <div className="overflow-x-auto">
                 <table className="min-w-full">
@@ -843,8 +884,11 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                             {(() => {
-                              const vendorPayments = payments.filter(payment => payment.vendorId === selectedVendor.vendorId);
-                              return vendorPayments.length > 0 ? vendorPayments.map((payment) => (
+                              // Use vendorPayments from Redux state instead of filtering all payments
+                              const currentVendorPayments = selectedVendor && vendorPayments[selectedVendor.vendorId] 
+                                ? vendorPayments[selectedVendor.vendorId] 
+                                : [];
+                              return currentVendorPayments.length > 0 ? currentVendorPayments.map((payment) => (
                     <tr 
                       key={payment.id} 
                                   className="hover:bg-gray-50 cursor-pointer transition-colors"
@@ -912,11 +956,152 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
               </div>
                   )}
 
+                  {statementActiveTab === 'filteredBills' && (
+                    <div>
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">Filtered Vendor Bills</h3>
+                            <p className="text-sm text-gray-600 mt-1">Bills fetched using the filter API endpoint</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (selectedVendor) {
+                                refreshVendorData();
+                              }
+                            }}
+                            // disabled={filteredBillsLoading} // This line is removed as per the edit hint
+                            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                              // filteredBillsLoading // This line is removed as per the edit hint
+                                // ? 'bg-gray-100 text-gray-400 cursor-not-allowed' // This line is removed as per the edit hint
+                                // : 'bg-blue-600 text-white hover:bg-blue-700' // This line is removed as per the edit hint
+                                'bg-blue-600 text-white hover:bg-blue-700' // This line is removed as per the edit hint
+                            }`}
+                          >
+                            <FaUndoAlt className="w-3 h-3" />
+                            {/* {filteredBillsLoading ? 'Refreshing...' : 'Refresh'} */}
+                            Refresh
+                          </button>
+                        </div>
+                        {loading && (
+                          <p className="text-sm text-blue-600 mt-1">Loading vendor data...</p>
+                        )}
+                      </div>
+                      
+                      {/* Summary Comparison */}
+                      {selectedVendor && (
+                        <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Vendor Summary</h4>
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div className="text-center">
+                              <p className="text-gray-600">Bills</p>
+                              <p className="font-semibold text-gray-900">
+                                {vendorBills[selectedVendor.vendorId] ? vendorBills[selectedVendor.vendorId].length : 0}
+                              </p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-gray-600">Payments</p>
+                              <p className="font-semibold text-gray-900">
+                                {vendorPayments[selectedVendor.vendorId] ? vendorPayments[selectedVendor.vendorId].length : 0}
+                              </p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-gray-600">Purchase Orders</p>
+                              <p className="font-semibold text-gray-900">
+                                {vendorPurchaseOrders[selectedVendor.vendorId] ? vendorPurchaseOrders[selectedVendor.vendorId].length : 0}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50">Bill No.</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50">Bill Date</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50">Due Date</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50">Total Amount</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50">Reference/PO No.</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50">Attachments</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {(() => {
+                              // Use filteredBills from Redux state
+                              const currentFilteredBills = selectedVendor && vendorBills[selectedVendor.vendorId] 
+                                ? vendorBills[selectedVendor.vendorId] 
+                                : [];
+                              
+                              return currentFilteredBills.length > 0 ? currentFilteredBills.map((bill) => (
+                                <tr 
+                                  key={bill.id} 
+                                  className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                  onClick={() => {
+                                    setSelectedBill(bill);
+                                    setShowAddForm('bill');
+                                  }}
+                                >
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <span className="text-sm font-medium text-blue-600">{bill.billNumber || 'N/A'}</span>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{bill.billDate}</td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{bill.dueDate}</td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <span className="text-sm font-semibold text-gray-900">₹{(bill.finalAmount || 0).toLocaleString('en-IN')}</span>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap">
+                                    <span className={`text-sm ${bill.billReference ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
+                                      {bill.billReference || '-'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-4 whitespace-nowrap text-center">
+                                    <span 
+                                      className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
+                                        (bill.attachmentUrls && bill.attachmentUrls.length > 0) || 
+                                        bill.attachmentUrls === 'Yes' || 
+                                        bill.attachmentUrls === true
+                                          ? 'bg-blue-100 text-blue-800 cursor-pointer hover:bg-blue-200' 
+                                          : 'bg-gray-100 text-gray-500'
+                                      }`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if ((bill.attachmentUrls && bill.attachmentUrls.length > 0) || 
+                                            bill.attachmentUrls === 'Yes' || 
+                                            bill.attachmentUrls === true) {
+                                          handleAttachmentClick(bill);
+                                        }
+                                      }}
+                                    >
+                                      {(bill.attachmentUrls && bill.attachmentUrls.length > 0) || 
+                                       bill.attachmentUrls === 'Yes' || 
+                                       bill.attachmentUrls === true ? '📎' : '-'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              )) : (
+                                <tr>
+                                  <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                                    {loading ? 'Loading vendor bills...' : 'No bills found for this vendor'}
+                                  </td>
+                                </tr>
+                              );
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
                   {statementActiveTab === 'statement' && (
                     <div>
                       {/* Statement Title */}
                       <div className="text-center mb-6">
                         <h2 className="text-xl font-bold text-gray-900 uppercase tracking-wide">Statement of Accounts</h2>
+                        {loading && (
+                          <p className="text-sm text-blue-600 mt-1">Loading vendor statement...</p>
+                        )}
                         <div className="mt-2 text-sm text-gray-600">
                           {(() => {
                             const dateRange = getDateRange(selectedDateRange);
@@ -947,11 +1132,16 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
                           </thead>
                           <tbody>
                             {(() => {
-                              const vendorBills = bills.filter(bill => bill.vendorId === selectedVendor.vendorId);
-                              const vendorPayments = payments.filter(payment => payment.vendorId === selectedVendor.vendorId);
+                              // Use vendor-specific data from Redux state
+                              const currentVendorBills = selectedVendor && vendorBills[selectedVendor.vendorId] 
+                                ? vendorBills[selectedVendor.vendorId] 
+                                : [];
+                              const currentVendorPayments = selectedVendor && vendorPayments[selectedVendor.vendorId] 
+                                ? vendorPayments[selectedVendor.vendorId] 
+                                : [];
                               
-                              const totalBilled = vendorBills.reduce((sum, bill) => sum + (bill.finalAmount || 0), 0);
-                              const totalPaid = vendorPayments.reduce((sum, payment) => sum + (payment.totalAmount || 0), 0);
+                              const totalBilled = currentVendorBills.reduce((sum, bill) => sum + (bill.finalAmount || 0), 0);
+                              const totalPaid = currentVendorPayments.reduce((sum, payment) => sum + (payment.totalAmount || 0), 0);
                               const balanceDue = totalBilled - totalPaid;
                               
                               return (
@@ -1000,9 +1190,13 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
                         </thead>
                         <tbody>
                           {(() => {
-                            // Get vendor's bills and payments
-                            const vendorBills = bills.filter(bill => bill.vendorId === selectedVendor.vendorId);
-                            const vendorPayments = payments.filter(payment => payment.vendorId === selectedVendor.vendorId);
+                            // Get vendor's bills and payments from Redux state
+                            const currentVendorBills = selectedVendor && vendorBills[selectedVendor.vendorId] 
+                              ? vendorBills[selectedVendor.vendorId] 
+                              : [];
+                            const currentVendorPayments = selectedVendor && vendorPayments[selectedVendor.vendorId] 
+                              ? vendorPayments[selectedVendor.vendorId] 
+                              : [];
                             
                             // Get selected date range
                             const dateRange = getDateRange(selectedDateRange);
@@ -1023,7 +1217,7 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
                             });
                             
                             // Add bills within date range
-                            vendorBills.forEach(bill => {
+                            currentVendorBills.forEach(bill => {
                               const billDate = new Date(bill.billDate || 'N/A');
                               if (billDate >= dateRange.startDate && billDate <= dateRange.endDate) {
                               runningBalance += bill.finalAmount || 0;
@@ -1040,7 +1234,7 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
                             });
                             
                             // Add payments within date range
-                            vendorPayments.forEach(payment => {
+                            currentVendorPayments.forEach(payment => {
                               const paymentDate = new Date(payment.paymentDate || 'N/A');
                               if (paymentDate >= dateRange.startDate && paymentDate <= dateRange.endDate) {
                               runningBalance -= payment.totalAmount || 0;
@@ -1102,11 +1296,16 @@ const [editingPO, setEditingPO] = useState(null); // Store the PO being edited
                   {/* Final Balance */}
                   <div className="text-right">
                     {(() => {
-                      const vendorBills = bills.filter(bill => bill.vendorId === selectedVendor.vendorId);
-                      const vendorPayments = payments.filter(payment => payment.vendorId === selectedVendor.vendorId);
+                      // Use vendor-specific data from Redux state
+                      const currentVendorBills = selectedVendor && vendorBills[selectedVendor.vendorId] 
+                        ? vendorBills[selectedVendor.vendorId] 
+                        : [];
+                      const currentVendorPayments = selectedVendor && vendorPayments[selectedVendor.vendorId] 
+                        ? vendorPayments[selectedVendor.vendorId] 
+                        : [];
                       
-                      const totalBilled = vendorBills.reduce((sum, bill) => sum + (bill.finalAmount || 0), 0);
-                      const totalPaid = vendorPayments.reduce((sum, payment) => sum + (payment.totalAmount || 0), 0);
+                      const totalBilled = currentVendorBills.reduce((sum, bill) => sum + (bill.finalAmount || 0), 0);
+                      const totalPaid = currentVendorPayments.reduce((sum, payment) => sum + (payment.totalAmount || 0), 0);
                       const balanceDue = totalBilled - totalPaid;
                       
                       return (

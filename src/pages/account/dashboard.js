@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FaUsers, 
   FaBuilding, 
@@ -81,13 +81,7 @@ const AccountDashboard = () => {
     loadDashboardData();
   }, [dispatch]);
 
-  useEffect(() => {
-    if (invoices && bills && expenses) {
-      calculateStats();
-    }
-  }, [invoices, bills, expenses]);
-
-  const calculateStats = () => {
+  const calculateStats = useCallback(() => {
     const totalInvoices = invoices?.length || 0;
     const totalBills = bills?.length || 0;
 
@@ -102,7 +96,13 @@ const AccountDashboard = () => {
       totalRevenue,
       totalExpenditure
     });
-  };
+  }, [invoices, bills, expenses]);
+
+  useEffect(() => {
+    if (invoices && bills && expenses) {
+      calculateStats();
+    }
+  }, [invoices, bills, expenses, calculateStats]);
 
   const handleModalOpen = (type, title) => {
     setModalType(type);
