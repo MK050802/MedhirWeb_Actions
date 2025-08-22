@@ -1,27 +1,28 @@
-# Base
-FROM node:alpine AS base
+#Base
+FROM node:alpine As Base
 
-# Deps
-FROM base AS deps
+#Deps
+FROM Base As Deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Builder
-FROM base AS builder
+#Builder
+FROM base As Builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=Deps /app/node_modules ./node_modules
 COPY . .
 COPY .container/.env .env
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build --omit=dev
 
-# Runner
-FROM base AS runner
+#Runner
+FROM Base As Runner
 WORKDIR /app
 ENV NODE_ENV=custom
 ENV NEXT_TELEMETRY_DISABLED=1
+
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
@@ -32,12 +33,10 @@ RUN chown -R $APPLICATION_USER /app
 USER $APPLICATION_USER
 
 EXPOSE 3000
-
 ENV PORT 3000
 
 COPY .container/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # Set the entrypoint to the newly added script.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-
 CMD ["node", "server.js"]
