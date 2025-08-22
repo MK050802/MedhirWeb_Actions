@@ -28,8 +28,53 @@ const CustomDatePicker = ({
   const inputRef = useRef(null);
   const calendarPopupRef = useRef(null);
 
-  // Get payroll settings from Redux
-  const { settings: payrollSettings } = useSelector((state) => state.payrollSettings || {});
+  // Get payroll freeze status from Redux (new API)
+  const { freezeStatus, checkLoading: freezeStatusLoading } = useSelector((state) => state.payrollFreezeStatus || {});
+
+  // Helper function to check if payroll is frozen for a specific month
+  const isPayrollFrozen = (date) => {
+    // Add null check to prevent errors
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+      return false;
+    }
+    
+    if (freezeStatusLoading || !freezeStatus) {
+      return false;
+    }
+    
+    // Handle different possible API response formats
+    let frozen = false;
+    if (typeof freezeStatus === 'boolean') {
+      frozen = freezeStatus === true;
+    } else if (typeof freezeStatus === 'object' && freezeStatus !== null) {
+      frozen = freezeStatus.isFrozen === true || freezeStatus.frozen === true || freezeStatus.status === true;
+    } else if (typeof freezeStatus === 'string') {
+      frozen = freezeStatus.toLowerCase() === 'true';
+    } else if (typeof freezeStatus === 'number') {
+      frozen = freezeStatus === 1;
+    }
+    
+    if (!frozen) return false;
+    
+    // If frozen, check if the date is in the month that should be frozen
+    // The API was called for the previous month (current month - 1)
+    const today = new Date();
+    const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const targetMonth = date.getMonth();
+    const targetYear = date.getFullYear();
+    const frozenMonth = previousMonth.getMonth();
+    const frozenYear = previousMonth.getFullYear();
+    
+    // Only freeze if the date is in the specific month that's frozen
+    // AND it's not the current month (current month should always be allowed)
+    const isCurrentMonth = (targetMonth === today.getMonth() && targetYear === today.getFullYear());
+    
+    if (isCurrentMonth) {
+      return false; // Current month is always allowed
+    }
+    
+    return (targetMonth === frozenMonth && targetYear === frozenYear);
+  };
 
   // Show all options for leave, only Full Day for comp-off
   const timeSlotOptions = isCompOff ? [
@@ -88,56 +133,10 @@ const CustomDatePicker = ({
     };
   }, [isOpen]);
 
-  // Debug logs for leave policy and restrictions
+  // Monitor changes for leave policy and restrictions
   useEffect(() => {
-    const restrictions = leavePolicy?.leaveAllocations?.[0]?.restrictions?.[0];
-    const restrictedDays = restrictions?.restrictedDays || [];
-    const allowedValue = restrictions?.allowedValue;
-    console.log('[CustomDatePicker] leavePolicy:', leavePolicy);
-    console.log('[CustomDatePicker] restrictedDays:', restrictedDays);
-    console.log('[CustomDatePicker] allowedValue:', allowedValue);
-    console.log('[CustomDatePicker] selectedDateObjects:', selectedDateObjects);
-    console.log('[CustomDatePicker] frozenDates:', frozenDates);
-    console.log('[CustomDatePicker] joiningDate:', joiningDate);
-    
-    // Debug log for date conditions
-    const today = new Date();
-    const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    console.log('[CustomDatePicker] previousMonth cutoff:', previousMonth);
-    console.log('[CustomDatePicker] today:', today);
-    
-    // Debug log for payroll settings and freeze logic
-    if (payrollSettings && payrollSettings.payrollEnablementDate && payrollSettings.freezeAfterDays) {
-      const payrollEnablementDate = payrollSettings.payrollEnablementDate;
-      const freezeAfterDays = payrollSettings.freezeAfterDays;
-      const currentDay = today.getDate();
-      const freezeDate = payrollEnablementDate + freezeAfterDays;
-      const isPastFreezeDate = currentDay > freezeDate;
-      
-      console.log('[CustomDatePicker] payrollSettings:', payrollSettings);
-      console.log('[CustomDatePicker] payrollEnablementDate:', payrollEnablementDate);
-      console.log('[CustomDatePicker] freezeAfterDays:', freezeAfterDays);
-      console.log('[CustomDatePicker] currentDay:', currentDay);
-      console.log('[CustomDatePicker] freezeDate:', freezeDate);
-      console.log('[CustomDatePicker] isPastFreezeDate:', isPastFreezeDate);
-    }
-    
-    // Debug log for joining date logic
-    if (joiningDate) {
-      const joiningDateObj = new Date(joiningDate);
-      console.log('[CustomDatePicker] joiningDate:', joiningDateObj);
-      console.log('[CustomDatePicker] joiningDate is before previousMonth cutoff:', joiningDateObj < previousMonth);
-      console.log('[CustomDatePicker] joiningDate is after previousMonth cutoff:', joiningDateObj >= previousMonth);
-    }
-    if (restrictedDays.length) {
-      const selectedRestricted = selectedDateObjects.filter(selected =>
-        restrictedDays.includes(format(selected.date, 'EEE'))
-      );
-      console.log('[CustomDatePicker] selected restricted days:', selectedRestricted.map(d => d.date));
-    }
-    // Debug log for weeklyOffs
-    console.log('[CustomDatePicker] weeklyOffs:', weeklyOffs, isCompOff ? '(ignored for comp-off)' : '');
-  }, [leavePolicy, selectedDateObjects, frozenDates, weeklyOffs, isCompOff, joiningDate, payrollSettings]);
+    // This effect monitors changes but doesn't log anything
+  }, [leavePolicy, selectedDateObjects, frozenDates, weeklyOffs, isCompOff, joiningDate, freezeStatus]);
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -162,61 +161,63 @@ const CustomDatePicker = ({
   const isDateDisabled = (date) => {
     if (!date) return true;
     
+    // FIRST: Check joining date restriction (dates before joining date are always disabled)
+    if (joiningDate) {
+      const joiningDateObj = new Date(joiningDate);
+      if (date < joiningDateObj) {
+        return true;
+      }
+    }
+    
     // Calculate the cutoff date (first day of previous month)
     const today = new Date();
     const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    
+
     
     // Check if date is before the previous month cutoff FIRST
     if (date < previousMonth) return true;
     
-          // Check payroll freeze logic - freeze previous month when current day exceeds freeze date
-      if (payrollSettings && payrollSettings.payrollEnablementDate && payrollSettings.freezeAfterDays) {
-        const payrollEnablementDate = payrollSettings.payrollEnablementDate;
-        const freezeAfterDays = payrollSettings.freezeAfterDays;
-        const currentDay = today.getDate();
+    // Check payroll freeze logic - freeze previous month if payroll is frozen
+    if (isPayrollFrozen(date)) {
+      return true;
+    }
+    
+    // Check if date is in the current month (always editable)
         const currentMonth = today.getMonth();
         const currentYear = today.getFullYear();
         const targetMonth = date.getMonth();
         const targetYear = date.getFullYear();
         
-        // Check if we're past the freeze date (e.g., if payrollEnablementDate=1, freezeAfterDays=4, then freeze date = 5th)
-        const freezeDate = payrollEnablementDate + freezeAfterDays;
-        const isPastFreezeDate = currentDay > freezeDate;
-        
-        // Only apply payroll freeze if the date would be selectable under the old rule
-        if (date >= previousMonth) {
-          if (targetYear === currentYear) {
-            if (targetMonth === currentMonth) {
-              // Current month: always editable (no freeze)
-              // No restrictions here
-            } else if (targetMonth === currentMonth - 1) {
-              // Previous month: freeze if we're past the freeze date
-              if (isPastFreezeDate) {
-                return true;
-              }
-            } else {
-              // Other months: not editable
-              return true;
-            }
-          } else if (targetYear === currentYear - 1) {
-            // Previous year: only allow if it's December and current month is January and not past freeze date
-            if (targetMonth === 11 && currentMonth === 0 && !isPastFreezeDate) {
-              // Allow December of previous year only if current month (January) is not past freeze date
-            } else {
-              return true;
-            }
-          } else {
-            // Other years: not editable
-            return true;
-          }
-        }
-      }
-    
-    // Only check joining date if the date would be selectable under the old rule
-    if (joiningDate) {
-      const joiningDateObj = new Date(joiningDate);
-      if (date < joiningDateObj) return true;
+    // Current month is always allowed
+    if (targetYear === currentYear && targetMonth === currentMonth) {
+      return false;
     }
+    
+    // Next month (current month + 1) is also allowed
+    if (targetYear === currentYear && targetMonth === currentMonth + 1) {
+      return false;
+    }
+    
+    // Previous month: editable when not frozen (already checked above)
+    if (targetYear === currentYear && targetMonth === currentMonth - 1) {
+      return false;
+    }
+    
+    // Other months in current year: not editable
+    if (targetYear === currentYear && targetMonth < currentMonth - 1) {
+      return true;
+    }
+    
+    // Previous year: only allow if it's December and current month is January
+    if (targetYear === currentYear - 1) {
+      const allowed = !(targetMonth === 11 && currentMonth === 0);
+      return !allowed;
+    }
+    
+    // Other years: not editable
+    return true;
     
     if (disabledDates.some(disabledDate => isSameDay(new Date(disabledDate), date))) return true;
     if (frozenDates.some(frozenDate => isSameDay(frozenDate, date))) return true;
@@ -224,9 +225,7 @@ const CustomDatePicker = ({
     // Freeze weekly offs - but skip this for comp-off requests
     if (!isCompOff && weeklyOffs && weeklyOffs.length > 0) {
       const dayName = format(date, 'EEEE'); // 'Sunday', 'Monday', etc.
-      console.log('[CustomDatePicker] Checking weekly off:', { date: format(date, 'dd MMM yyyy'), dayName, weeklyOffs, isCompOff });
       if (weeklyOffs.includes(dayName)) {
-        console.log('[CustomDatePicker] Date is weekly off, disabling:', format(date, 'dd MMM yyyy'));
         return true;
       }
     }
@@ -234,7 +233,6 @@ const CustomDatePicker = ({
     // Fallback: Also check for weekends if weeklyOffs is not provided or empty
     if (!isCompOff && (!weeklyOffs || weeklyOffs.length === 0)) {
       if (isWeekend(date)) {
-        console.log('[CustomDatePicker] Date is weekend (fallback), disabling:', format(date, 'dd MMM yyyy'));
         return true;
       }
     }
@@ -245,9 +243,7 @@ const CustomDatePicker = ({
         ? departmentInfo.weeklyHolidays
         : departmentInfo.weeklyHolidays.split(',').map(day => day.trim());
       const dayName = format(date, 'EEEE');
-      console.log('[CustomDatePicker] Checking department holidays:', { date: format(date, 'dd MMM yyyy'), dayName, weekDays, departmentInfo: departmentInfo?.weeklyHolidays });
       if (weekDays.includes(dayName)) {
-        console.log('[CustomDatePicker] Date is department holiday, disabling:', format(date, 'dd MMM yyyy'));
         return true;
       }
     }
@@ -263,15 +259,6 @@ const CustomDatePicker = ({
         );
         const willDisable = restrictedSelected.length >= restrictions.allowedValue &&
             !restrictedSelected.some(selected => isSameDay(selected.date, date));
-        
-        console.log('[CustomDatePicker] isDateDisabled check for restricted day:', {
-          date: format(date, 'dd MMM yyyy'),
-          dayName,
-          restrictedSelectedCount: restrictedSelected.length,
-          allowedValue: restrictions.allowedValue,
-          willDisable,
-          isAlreadySelected: restrictedSelected.some(selected => isSameDay(selected.date, date))
-        });
         
         if (willDisable) {
           return true;
@@ -291,96 +278,35 @@ const CustomDatePicker = ({
     return disabledDates.some(disabledDate => isSameDay(new Date(disabledDate), date));
   };
 
-    const getDateClassName = (date) => {
-    if (!date) return 'invisible';
+  // Helper function to check if a date is a weekly off
+  const isWeeklyOff = (date) => {
+    if (!date) return false;
     
-    let baseClasses = 'relative p-1.5 text-center cursor-pointer rounded-md transition-all duration-200';
-    
-    if (isDateDisabled(date)) {
-      if (isDateWithLeaveApplied(date)) {
-        // Date with leave applied - show in blue
-        return `${baseClasses} bg-blue-100 text-blue-700 hover:bg-blue-200 cursor-not-allowed`;
-      }
-      
-      // Check payroll freeze logic first - show as gray for consistency
-      if (payrollSettings && payrollSettings.payrollEnablementDate && payrollSettings.freezeAfterDays) {
-        const payrollEnablementDate = payrollSettings.payrollEnablementDate;
-        const freezeAfterDays = payrollSettings.freezeAfterDays;
-        const today = new Date();
-        const currentDay = today.getDate();
-        const currentMonth = today.getMonth();
-        const currentYear = today.getFullYear();
-        const targetMonth = date.getMonth();
-        const targetYear = date.getFullYear();
-        
-        const freezeDate = payrollEnablementDate + freezeAfterDays;
-        const isPastFreezeDate = currentDay > freezeDate;
-        
-        if (targetYear === currentYear) {
-          if (targetMonth === currentMonth) {
-            // Current month: always editable (no freeze)
-            // No restrictions here
-          } else if (targetMonth === currentMonth - 1 && isPastFreezeDate) {
-            // Previous month frozen due to past freeze date - show in gray
-            return `${baseClasses} text-gray-300 cursor-not-allowed`;
-          } else if (targetMonth < currentMonth - 1) {
-            // Older months - show in gray
-            return `${baseClasses} text-gray-300 cursor-not-allowed`;
-          }
-        } else if (targetYear < currentYear - 1 || (targetYear === currentYear - 1 && targetMonth < 11)) {
-          // Older years - show in gray
-          return `${baseClasses} text-gray-300 cursor-not-allowed`;
-        }
-      }
-      
-      // Check if it's before previous month cutoff FIRST - show in gray
-      const today = new Date();
-      const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      if (date < previousMonth) {
-        return `${baseClasses} text-gray-300 cursor-not-allowed`;
-      }
-      
-      // Only show red for joining date if the date would be selectable under old rule
-      if (joiningDate) {
-        const joiningDateObj = new Date(joiningDate);
-        if (date < joiningDateObj) {
-          return `${baseClasses} text-red-300 cursor-not-allowed`;
-        }
-      }
-      
-      // Check if it's a weekly off
+    // Freeze weekly offs - but skip this for comp-off requests
       if (!isCompOff && weeklyOffs && weeklyOffs.length > 0) {
         const dayName = format(date, 'EEEE'); // 'Sunday', 'Monday', etc.
-        if (weeklyOffs.includes(dayName)) {
-          console.log('[CustomDatePicker] Date is weekly off in getDateClassName:', format(date, 'dd MMM yyyy'), dayName);
-          return `${baseClasses} text-gray-300 cursor-not-allowed`;
-        }
+      return weeklyOffs.includes(dayName);
       }
       
       // Fallback: Also check for weekends if weeklyOffs is not provided or empty
       if (!isCompOff && (!weeklyOffs || weeklyOffs.length === 0)) {
-        if (isWeekend(date)) {
-          console.log('[CustomDatePicker] Date is weekend (fallback) in getDateClassName:', format(date, 'dd MMM yyyy'));
-          return `${baseClasses} text-gray-300 cursor-not-allowed`;
-        }
-      }
-      
-      return `${baseClasses} text-gray-300 cursor-not-allowed`;
+      return isWeekend(date);
     }
     
-    if (isDateSelected(date)) {
-      return `${baseClasses} bg-blue-500 text-white hover:bg-blue-600`;
-    }
-    
-    if (frozenDates.some(frozenDate => isSameDay(frozenDate, date))) {
-      return `${baseClasses} bg-gray-100 text-gray-700`;
-    }
-    
-    return `${baseClasses} hover:bg-blue-50 text-gray-700`;
+    return false;
   };
 
+  // Helper function to check if a date is disabled due to joining date
+  const isDateBeforeJoining = (date) => {
+    if (!date || !joiningDate) return false;
+    const joiningDateObj = new Date(joiningDate);
+    return date < joiningDateObj;
+  };
+
+  
+
   const handleDateClick = (date) => {
-    if (isDateDisabled(date)) return;
+    if (isDateDisabled(date) || isDateBeforeJoining(date)) return;
 
     let newSelectedDates;
     const restrictions = leavePolicy?.leaveAllocations?.[0]?.restrictions?.[0];
@@ -393,16 +319,7 @@ const CustomDatePicker = ({
       isSameDay(selected.date, date)
     );
 
-    // Debug log for click
-    console.log('[CustomDatePicker] handleDateClick:', {
-      date,
-      dayName,
-      restrictedDays,
-      allowedValue,
-      selectedDateObjects,
-      frozenDates,
-      isAlreadySelected
-    });
+
 
     if (isAlreadySelected) {
       // Allow removing any selected date (not just start or end)
@@ -413,11 +330,6 @@ const CustomDatePicker = ({
         const restrictedSelected = newSelectedDates.filter(selected => 
           restrictions.restrictedDays.includes(format(selected.date, 'EEE'))
         );
-        console.log('[CustomDatePicker] Removing restricted day:', {
-          restrictedSelectedCount: restrictedSelected.length,
-          allowedValue,
-          willUnfreeze: restrictedSelected.length < allowedValue
-        });
         // Only unfreeze if we're now below the limit
         if (restrictedSelected.length < allowedValue) {
           const month = date.getMonth();
@@ -448,11 +360,6 @@ const CustomDatePicker = ({
             const restrictedSelected = selectedDateObjects.filter(selected => 
               restrictions.restrictedDays.includes(format(selected.date, 'EEE'))
             );
-            console.log('[CustomDatePicker] Selecting restricted day:', {
-              restrictedSelectedCount: restrictedSelected.length,
-              allowedValue,
-              willFreeze: restrictedSelected.length + 1 >= allowedValue
-            });
             if (restrictedSelected.length >= allowedValue) {
               toast.error(`You can only select up to ${allowedValue} restricted day(s)`);
               return;
@@ -471,7 +378,6 @@ const CustomDatePicker = ({
                   newFrozen.push(dObj);
                 }
               }
-              console.log('[CustomDatePicker] Freezing restricted days:', newFrozen.map(d => format(d, 'dd MMM yyyy')));
               setFrozenDates(prev => ([...prev, ...newFrozen]));
             }
           }
@@ -616,63 +522,55 @@ const CustomDatePicker = ({
                     {day}
                   </div>
                 ))}
-                {getDaysInMonth(currentMonth).map((date, index) => (
+                {getDaysInMonth(currentMonth).map((date, index) => {
+                  // Skip rendering for null dates (padding days)
+                  if (!date) {
+                    return <div key={index} className="w-10 h-10" />;
+                  }
+                  
+                  const isSelected = isDateSelected(date);
+                  return (
                   <div
                     key={index}
-                    className={getDateClassName(date)}
+                      className={`relative w-10 h-10 flex items-center justify-center text-sm rounded-md cursor-pointer transition-all duration-200 ${
+                        isSelected
+                          ? "bg-blue-500 text-white font-medium shadow-md"
+                          : isDateWithLeaveApplied(date)
+                          ? "bg-green-100 text-green-700 border-2 border-green-300 cursor-not-allowed"
+                          : isWeeklyOff(date)
+                          ? "bg-blue-100 text-blue-700 border-transparent cursor-not-allowed"
+                          : isDateBeforeJoining(date) || isPayrollFrozen(date) || isDateDisabled(date)
+                          ? "bg-gray-100 text-gray-400 border-transparent cursor-not-allowed"
+                          : hoverDate && isSameDay(date, hoverDate)
+                          ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
+                          : "hover:bg-gray-100 text-gray-700 border border-transparent hover:border-gray-300"
+                      }`}
                     onClick={(e) => {
                       e.stopPropagation();
                       date && handleDateClick(date);
                     }}
                     onMouseEnter={() => setHoverDate(date)}
                     onMouseLeave={() => setHoverDate(null)}
-                    title={date && isDateWithLeaveApplied(date) ? "Leave already applied for this date" : 
-                           date && payrollSettings && payrollSettings.payrollEnablementDate && payrollSettings.freezeAfterDays ? (() => {
-                             const payrollEnablementDate = payrollSettings.payrollEnablementDate;
-                             const freezeAfterDays = payrollSettings.freezeAfterDays;
-                             const today = new Date();
-                             const currentDay = today.getDate();
-                             const currentMonth = today.getMonth();
-                             const currentYear = today.getFullYear();
-                             const targetMonth = date.getMonth();
-                             const targetYear = date.getFullYear();
-                             
-                             const freezeDate = payrollEnablementDate + freezeAfterDays;
-                             const isPastFreezeDate = currentDay > freezeDate;
-                             
-                             if (targetYear === currentYear) {
-                               if (targetMonth === currentMonth) {
-                                 // Current month: always editable (no freeze)
-                                 return "";
-                               } else if (targetMonth === currentMonth - 1 && isPastFreezeDate) {
-                                 return "Dates outside editable range";
-                               } else if (targetMonth < currentMonth - 1) {
-                                 return "Dates outside editable range";
-                               }
-                             } else if (targetYear < currentYear - 1 || (targetYear === currentYear - 1 && targetMonth < 11)) {
-                               return "Dates outside editable range";
-                             }
-                             return "";
-                           })() :
-                           date && date < new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1) ? "Cannot apply leave before previous month" :
-                           date && joiningDate && date < new Date(joiningDate) ? "Cannot apply leave before joining date" :
-                           date && !isCompOff && weeklyOffs && weeklyOffs.length > 0 && weeklyOffs.includes(format(date, 'EEEE')) ? "Weekly off" : ""}
+                    title={date && isWeeklyOff(date) ? "Date is a weekly off" : 
+                            date && isDateWithLeaveApplied(date) ? "Leave already applied for this date" : 
+                            date && (isDateBeforeJoining(date) || isPayrollFrozen(date) || isDateDisabled(date)) ? "Disabled" : ""}
                   >
                     {date ? (
                       <>
                         <span className={`
                           relative z-10 font-medium
-                          ${isDateSelected(date) ? 'text-white' : ''}
+                            ${isSelected ? 'text-white' : ''}
                         `}>
                           {format(date, 'd')}
                         </span>
-                        {isDateSelected(date) && (
+                          {isSelected && (
                           <span className="absolute inset-0 rounded-md bg-blue-500 shadow-sm"></span>
                         )}
                       </>
                     ) : ''}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import getConfig from "next/config";
+import { getItemFromSessionStorage } from "./sessionStorageSlice";
 
 const { publicRuntimeConfig } = getConfig();
 
@@ -11,12 +12,19 @@ export const markManualAttendance = createAsyncThunk(
       // Get the HR employee ID from session storage
       const hrEmployeeId = sessionStorage.getItem("employeeId");
       
+      // Get the authentication token
+      const token = getItemFromSessionStorage("token", null);
+      if (!token) {
+        return rejectWithValue("Authentication token not found");
+      }
+      
       // Use the new API endpoint with HR employee ID in the URL path
       const response = await fetch(
         `${publicRuntimeConfig.attendanceURL}/attendance/bulk-employee/${hrEmployeeId}`,
         {
           method: "POST",
           headers: {
+            "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(attendanceData), // Keep the original payload structure
@@ -53,12 +61,19 @@ export const markSingleEmployeeMonthAttendance = createAsyncThunk(
       // Get the HR employee ID from session storage
       const hrEmployeeId = sessionStorage.getItem("employeeId");
       
+      // Get the authentication token
+      const token = getItemFromSessionStorage("token", null);
+      if (!token) {
+        return rejectWithValue("Authentication token not found");
+      }
+      
       // Use the new API endpoint with HR employee ID in the URL path
       const response = await fetch(
         `${publicRuntimeConfig.attendanceURL}/attendance/bulk-employee/${hrEmployeeId}`,
         {
           method: "POST",
           headers: {
+            "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(attendanceData), // Keep the original payload structure
@@ -86,12 +101,19 @@ export const markAllEmployeesDateAttendance = createAsyncThunk(
       // Get the HR employee ID from session storage
       const hrEmployeeId = sessionStorage.getItem("employeeId");
       
+      // Get the authentication token
+      const token = getItemFromSessionStorage("token", null);
+      if (!token) {
+        return rejectWithValue("Authentication token not found");
+      }
+      
       // Use the new API endpoint with HR employee ID in the URL path
       const response = await fetch(
         `${publicRuntimeConfig.attendanceURL}/attendance/bulk-date/${hrEmployeeId}`,
         {
           method: "POST",
           headers: {
+            "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(attendanceData), // Keep the original payload structure
