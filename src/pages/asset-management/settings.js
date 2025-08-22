@@ -2144,24 +2144,11 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                 </div>
 
                                 <div>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
-                                            <span className="text-sm text-gray-500">
-                                                {fields.length}/15 fields
-                                            </span>
-                                        </div>
-                                        <button
-                                            onClick={addField}
-                                            disabled={fields.length >= 15}
-                                            className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all duration-150 ${
-                                                fields.length >= 15
-                                                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                                            }`}
-                                        >
-                                            <FaPlus /> Add Field
-                                        </button>
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
+                                        <span className="text-sm text-gray-500">
+                                            {fields.length}/15 fields
+                                        </span>
                                     </div>
 
                                     {fields.length === 0 && (
@@ -2244,14 +2231,27 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                 </div>
                             </div>
 
-                            {/* Sticky Footer with Save Button */}
+                            {/* Sticky Footer with Add Field and Save Form Buttons */}
                             <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 shadow-lg">
-                                <button
-                                    onClick={handleSaveForm}
-                                    className="w-full px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium transition-colors duration-200"
-                                >
-                                    {formLoading ? 'Saving...' : 'Save Form'}
-                                </button>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={addField}
+                                        disabled={fields.length >= 15}
+                                        className={`flex-1 px-6 py-3 rounded-md flex items-center justify-center gap-2 font-medium transition-all duration-200 ${
+                                            fields.length >= 15
+                                                ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}
+                                    >
+                                        <FaPlus /> Add Field
+                                    </button>
+                                    <button
+                                        onClick={handleSaveForm}
+                                        className="flex-1 px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium transition-colors duration-200"
+                                    >
+                                        {formLoading ? 'Saving...' : 'Save Form'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -2360,24 +2360,11 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                 </div>
 
                                 <div>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
-                                            <span className="text-sm text-gray-500">
-                                                {fields.length}/15 fields
-                                            </span>
-                                        </div>
-                                        <button
-                                            onClick={addField}
-                                            disabled={fields.length >= 15}
-                                            className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all duration-150 ${
-                                                fields.length >= 15
-                                                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                                            }`}
-                                        >
-                                            <FaPlus /> Add Field
-                                        </button>
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
+                                        <span className="text-sm text-gray-500">
+                                            {fields.length}/15 fields
+                                        </span>
                                     </div>
 
                                     {fields.length === 0 && (
@@ -2460,15 +2447,28 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                 </div>
                             </div>
 
-                            {/* Save Button - Fixed at bottom */}
-                            <div className="pt-4 mt-4 border-t border-gray-200">
-                                <button
-                                    onClick={handleSaveForm}
-                                    disabled={formLoading || !formName.trim() || !selectedCategory || fields.length === 0}
-                                    className="w-full px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 cursor-not-allowed font-medium"
-                                >
-                                    {formLoading ? 'Saving...' : 'Update Form'}
-                                </button>
+                            {/* Sticky Footer with Add Field and Update Form Buttons */}
+                            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 shadow-lg">
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={addField}
+                                        disabled={fields.length >= 15}
+                                        className={`flex-1 px-6 py-3 rounded-md flex items-center justify-center gap-2 font-medium transition-all duration-200 ${
+                                            fields.length >= 15
+                                                ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}
+                                    >
+                                        <FaPlus /> Add Field
+                                    </button>
+                                    <button
+                                        onClick={handleSaveForm}
+                                        disabled={formLoading || !formName.trim() || !selectedCategory || fields.length === 0}
+                                        className="flex-1 px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 cursor-not-allowed font-medium"
+                                    >
+                                        {formLoading ? 'Saving...' : 'Update Form'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
