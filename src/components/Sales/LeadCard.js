@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useDispatch, useSelector } from 'react-redux';
-import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import {
   FaStar,
   FaRegStar,
@@ -48,24 +46,6 @@ const LeadCard = ({ lead, onEdit, onConvert, onMarkLost, onMarkJunk, onScheduleA
   useEffect(() => {
     dispatch(fetchPipelines());
   }, [dispatch]);
-  
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    isDragging,
-  } = useDraggable({ 
-    id: lead.leadId,
-    data: {
-      type: 'lead',
-      lead: lead
-    }
-  });
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-  };
 
   const handleCardSingleClick = (e) => {
     if (e.target.closest('.lead-actions')) {
@@ -243,20 +223,14 @@ const LeadCard = ({ lead, onEdit, onConvert, onMarkLost, onMarkJunk, onScheduleA
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
       onClick={handleCardSingleClick}
-      {...attributes}
-      {...listeners}
       className={`
-        p-3 rounded-lg shadow-sm border transition-all duration-200 cursor-grab relative overflow-visible
+        p-3 rounded-lg shadow-sm border transition-all duration-200 cursor-pointer relative overflow-visible
         ${isFrozenHighPotential 
           ? 'bg-gradient-to-br from-blue-50 to-purple-50 border-blue-200 shadow-blue-100' 
           : 'bg-white border-gray-100 hover:shadow-md'
         }
-        ${isDragging ? 'opacity-50 shadow-lg scale-105 rotate-1' : 'hover:shadow-md'}
-        ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
-        ${isDragging ? 'z-50' : ''}
+        hover:shadow-md
         ${isFrozenHighPotential ? 'hover:shadow-blue-200' : ''}
       `}
     >
@@ -291,19 +265,19 @@ const LeadCard = ({ lead, onEdit, onConvert, onMarkLost, onMarkJunk, onScheduleA
       
       {/* Budget and Date */}
       <div className={`flex items-center gap-2 mb-2 text-xs ${isFrozenHighPotential ? 'text-blue-700' : 'text-gray-600'}`}>
-        <span className="flex items-center gap-1 font-medium">
+        {/* <span className="flex items-center gap-1 font-medium">
           <FaRupeeSign className={`text-xs ${isFrozenHighPotential ? 'text-blue-600' : 'text-blue-500'}`} />
           {lead.budget ? Number(lead.budget).toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '0'}
-        </span>
-        <span className={isFrozenHighPotential ? 'text-blue-400' : 'text-gray-300'}>•</span>
+        </span> */}
+        {/* <span className={isFrozenHighPotential ? 'text-blue-400' : 'text-gray-300'}>•</span>
         <span className="flex items-center gap-1">
           <FaCalendarAlt className={`text-xs ${isFrozenHighPotential ? 'text-blue-500' : 'text-gray-400'}`} />
           {formatDate(lead.dateOfCreation)}
-        </span>
+        </span> */}
       </div>
       
       {/* Team Members */}
-      <div className="flex items-center justify-between mb-2">
+      {/* <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           {allowAssignment ? (
             <>
@@ -337,17 +311,17 @@ const LeadCard = ({ lead, onEdit, onConvert, onMarkLost, onMarkJunk, onScheduleA
         </div>
         <div className="flex items-center gap-2">
         {/* Activity Button */}
-        <button
+        {/* <button
           type="button"
           title="Schedule Activity"
           onClick={() => onScheduleActivity && onScheduleActivity(lead)}
           className="lead-actions hover:bg-blue-50 rounded-full p-1 transition-colors text-gray-400 hover:text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-300"
         >
           <FaRegClock size={14} />
-        </button>
+        </button> */}
 
         {/* Freeze Button - Only show for High Potential leads */}
-        {isHighPotential() && (
+        {/* {isHighPotential() && (
           <CustomTooltip text={lead.isFreeze ? "Lead is frozen" : "Freeze Lead"}>
             <button
               type="button"
@@ -362,18 +336,18 @@ const LeadCard = ({ lead, onEdit, onConvert, onMarkLost, onMarkJunk, onScheduleA
               <FaSnowflake size={14} />
             </button>
             </CustomTooltip>
-        )}
+        )} */}
 
-        <button
+        {/* <button
           type="button"
           title="Mark as Lost or Junk"
           onClick={handleTrashAction}
           className="lead-actions hover:bg-red-50 rounded-full p-1 transition-colors text-gray-400 hover:text-red-600 focus:outline-none focus:ring-1 focus:ring-red-300"
         >
           <FaTrash size={14} />
-        </button>
-        </div>
-      </div>
+        </button> */}
+        {/* </div>
+      </div> */}
       
       {/* Activity Status */}
       {lead.latestActivityTitle && (

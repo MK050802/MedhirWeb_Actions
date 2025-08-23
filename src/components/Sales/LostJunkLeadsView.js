@@ -347,9 +347,6 @@ const LostJunkLeadsView = ({ isManager, dateFilterProps = {}, onFilterChange, on
                           Budget
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Sales Rep
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -376,9 +373,6 @@ const LostJunkLeadsView = ({ isManager, dateFilterProps = {}, onFilterChange, on
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             ₹{lead.budget ? Number(lead.budget).toLocaleString('en-IN') : '0'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatDate(lead.dateOfCreation)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {lead.salesRep || 'Not Assigned'}

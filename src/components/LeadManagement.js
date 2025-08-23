@@ -27,7 +27,7 @@ const defaultLeadData = {
   name: "",
   contactNumber: "",
   email: "",
-  projectType: "",
+  propertyType: "",
   projectAddress: "",
   expectedBudget: "",
   status: "New", // Default status
@@ -66,7 +66,7 @@ const LeadManagement = ({ role }) => {
   const isManager = role === "MANAGER"; // Check if role is 'MANAGER'
   const isSales = role === "EMPLOYEE"; // Check if role is 'sales'
 
-  const projectTypes = [
+  const propertyTypes = [
     "2 BHK Flat",
     "3 BHK Flat",
     "4 BHK Flat",
@@ -230,7 +230,7 @@ const LeadManagement = ({ role }) => {
         name: lead.name,
         contactNumber: lead.contactNumber,
         email: lead.email,
-        projectType: lead.projectType,
+        propertyType: lead.propertyType,
         projectAddress: lead.projectAddress,
         expectedBudget: lead.expectedBudget,
         salesRep: lead.salesRep,
@@ -271,7 +271,7 @@ const LeadManagement = ({ role }) => {
       name: leadToMarkJunk.name,
       contactNumber: leadToMarkJunk.contactNumber,
       email: leadToMarkJunk.email,
-      projectType: leadToMarkJunk.projectType,
+      propertyType: leadToMarkJunk.propertyType,
       projectAddress: leadToMarkJunk.projectAddress,
       expectedBudget: leadToMarkJunk.expectedBudget,
       salesRep: leadToMarkJunk.salesRep,
@@ -296,7 +296,7 @@ const LeadManagement = ({ role }) => {
       name: leadToMarkLost.name,
       contactNumber: leadToMarkLost.contactNumber,
       email: leadToMarkLost.email,
-      projectType: leadToMarkLost.projectType,
+      propertyType: leadToMarkLost.propertyType,
       projectAddress: leadToMarkLost.projectAddress,
       expectedBudget: leadToMarkLost.expectedBudget,
     })).then(() => {
@@ -473,7 +473,7 @@ const LeadManagement = ({ role }) => {
       { key: "name", label: "Name" },
       { key: "contactNumber", label: "Contact" },
       { key: "email", label: "Email" },
-      { key: "projectType", label: "Project Type" },
+      { key: "propertyType", label: "Project Type" },
       { key: "projectAddress", label: "Project Address" },
       { key: "expectedBudget", label: "Budget" },
     ];
@@ -487,7 +487,7 @@ const LeadManagement = ({ role }) => {
             { key: "name", label: "Name" },
             { key: "contactNumber", label: "Contact" },
             { key: "email", label: "Email" },
-            { key: "projectType", label: "Project Type" },
+            { key: "propertyType", label: "Project Type" },
             { key: "projectAddress", label: "Project Address" },
             { key: "expectedBudget", label: "Budget" },
           ];
@@ -535,7 +535,7 @@ const LeadManagement = ({ role }) => {
             { key: "name", label: "Name" },
             { key: "contactNumber", label: "Contact" },
             { key: "email", label: "Email" },
-            { key: "projectType", label: "Project Type" },
+            { key: "propertyType", label: "Project Type" },
             { key: "callDescription", label: "Latest Call Desc." },
             { key: "nextCall", label: "Next Follow Up" },
             { key: "salesRep", label: "Sales Rep" }, // Added
@@ -574,7 +574,7 @@ const LeadManagement = ({ role }) => {
             { key: "name", label: "Name" },
             { key: "email", label: "Email" },
             { key: "contactNumber", label: "Contact" },
-            { key: "projectType", label: "Project Type" },
+            { key: "propertyType", label: "Project Type" },
             { key: "projectAddress", label: "Project Address" },
             { key: "expectedBudget", label: "Budget" },
             { key: "quotedAmount", label: "Initial Quote" },
@@ -657,7 +657,7 @@ const LeadManagement = ({ role }) => {
             { key: "name", label: "Name" },
             { key: "contactNumber", label: "Contact" },
             { key: "email", label: "Email" },
-            { key: "projectType", label: "Project Type" },
+            { key: "propertyType", label: "Project Type" },
             { key: "callDescription", label: "Latest Call Desc." },
             { key: "nextCall", label: "Next Follow Up" },
             // Add Sales Rep/Designer
@@ -671,7 +671,7 @@ const LeadManagement = ({ role }) => {
             { key: "name", label: "Name" },
             { key: "email", label: "Email" },
             { key: "contactNumber", label: "Contact" },
-            { key: "projectType", label: "Project Type" },
+            { key: "propertyType", label: "Project Type" },
             { key: "projectAddress", label: "Project Address" },
             { key: "expectedBudget", label: "Budget" },
             { key: "quotedAmount", label: "Initial Quote" },
@@ -863,7 +863,7 @@ const LeadManagement = ({ role }) => {
         name: editingLead.name,
         contactNumber: editingLead.contactNumber,
         email: editingLead.email,
-        projectType: editingLead.projectType,
+        propertyType: editingLead.propertyType,
         projectAddress: editingLead.projectAddress,
         expectedBudget: editingLead.expectedBudget,
         status: "In Progress",
@@ -931,7 +931,7 @@ const LeadManagement = ({ role }) => {
       name: currentLead.name,
       contactNumber: currentLead.contactNumber,
       email: currentLead.email,
-      projectType: currentLead.projectType,
+      propertyType: currentLead.propertyType,
       projectAddress: currentLead.projectAddress,
       expectedBudget: currentLead.expectedBudget,
       salesRep: currentLead.salesRep,
@@ -973,7 +973,7 @@ const LeadManagement = ({ role }) => {
             "name",
             "contactNumber",
             "email",
-            "projectType",
+            "propertyType",
             "projectAddress",
             "expectedBudget",
           ].includes(fieldName);
@@ -1197,14 +1197,14 @@ const LeadManagement = ({ role }) => {
                     Project Type
                   </label>
                   <select
-                    name="projectType"
-                    value={formData.projectType}
+                    name="propertyType"
+                    value={formData.propertyType}
                     onChange={handleInputChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    disabled={!isFieldEditable("projectType")}
+                    disabled={!isFieldEditable("propertyType")}
                   >
                     <option value="">Select Project Type</option>
-                    {projectTypes.map((type) => (
+                    {propertyTypes.map((type) => (
                       <option key={type} value={type}>
                         {type}
                       </option>

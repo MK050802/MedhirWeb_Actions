@@ -156,8 +156,8 @@ export const moveLeadToPipeline = createAsyncThunk(
       
       console.log('Move lead response:', response.data);
       
-      // Refetch all leads after move to get updated grouped format
-      dispatch(fetchLeads());
+      // Refetch all leads after move to get updated grouped format (silent to avoid UI blinking)
+      dispatch(fetchLeads({ silent: true }));
       
       return { leadId, newPipelineId };
     } catch (error) {
@@ -179,28 +179,40 @@ const leadsSlice = createSlice({
     reducers: {},
     extraReducers: (builder) => {
         builder
-            .addCase(fetchLeads.pending, (state) => {
+            .addCase(fetchLeads.pending, (state, action) => {
+                // Avoid UI blinking during background refreshes
+                if (action?.meta?.arg?.silent) {
+                    return;
+                }
                 state.loading = true;
                 state.error = null;
                 state.status = 'loading';
             })
             .addCase(fetchLeads.fulfilled, (state, action) => {
+                // Always update data, but avoid toggling loading/status on silent refresh
+                if (action?.meta?.arg?.silent) {
+                    state.leads = action.payload;
+                    return;
+                }
                 state.loading = false;
                 state.leads = action.payload;
                 state.status = 'succeeded';
             })
             .addCase(fetchLeads.rejected, (state, action) => {
+                if (action?.meta?.arg?.silent) {
+                    // Keep previous UI state on silent errors
+                    return;
+                }
                 state.loading = false;
                 state.error = action.payload || action.error.message;
                 state.status = 'failed';
             })
 
             .addCase(updateLead.pending, (state) => {
-                state.loading = true;
+                // Do not toggle global list loading during mutations to avoid page-level spinners
                 state.error = null;
             })
             .addCase(updateLead.fulfilled, (state, action) => {
-                state.loading = false;
                 state.error = null;
                 // Update the lead in the leads array (handle both grouped and flat formats)
                 if (Array.isArray(state.leads) && state.leads.length > 0) {
@@ -225,20 +237,17 @@ const leadsSlice = createSlice({
                 }
             })
             .addCase(updateLead.rejected, (state, action) => {
-                state.loading = false;
                 state.error = action.error.message;
             })
 
             .addCase(createLead.pending, (state) => {
-                state.loading = true;
+                // Do not toggle global list loading during create to avoid page-level spinners
             })
             .addCase(createLead.fulfilled, (state, action) => {
-                state.loading = false;
                 // Add the new lead to the leads array
                 state.leads.push(action.payload);
             })
             .addCase(createLead.rejected, (state, action) => {
-                state.loading = false;
                 state.error = action.error.message;
             })
 
@@ -256,16 +265,14 @@ const leadsSlice = createSlice({
                 state.lead = null;
             })
             .addCase(moveLeadToPipeline.pending, (state) => {
-                state.loading = true;
+                // Keep UI stable during move; avoid global loading flips
                 state.error = null;
             })
             .addCase(moveLeadToPipeline.fulfilled, (state, action) => {
-                state.loading = false;
                 state.error = null;
                 // The leads will be refreshed by fetchLeads, so no need to update here
             })
             .addCase(moveLeadToPipeline.rejected, (state, action) => {
-                state.loading = false;
                 state.error = action.payload || action.error.message;
             })
     }

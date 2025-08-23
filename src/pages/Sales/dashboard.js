@@ -85,7 +85,7 @@ const defaultLeadData = {
   name: "",
   contactNumber: "",
   email: "",
-  projectType: "",
+  propertyType: "",
   propertyType: "",
   address: "",
   area: "",

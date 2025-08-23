@@ -565,7 +565,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar, autoExpand = true }) => {
             hover:text-blue-600 hover:bg-blue-50 shadow-md 
             transition-all duration-300 ease-in-out
             border border-gray-200
-            transform hover:scale-105 active:scale-95
+            transform hover:scale-105 active:scale-95 z-[9999]
           `}
           title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >

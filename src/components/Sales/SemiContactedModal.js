@@ -19,7 +19,7 @@ const SemiContactedModal = ({
 }) => {
   const dispatch = useDispatch();
   const [formData, setFormData] = useState({
-    projectName: "",
+    propertyName: "",
     budget: "",
     firstCallDate: ""
   });
@@ -31,7 +31,7 @@ const SemiContactedModal = ({
     if (isOpen) {
       // dispatch(fetchLeadById(lead.leadId));
       setFormData({
-        projectName: "",
+        propertyName: "",
         budget: "",
         firstCallDate: ""
       });
@@ -44,7 +44,7 @@ const SemiContactedModal = ({
     e.preventDefault();
     
     // Enhanced validation
-    if (!formData.projectName.trim()) {
+    if (!formData.propertyName.trim()) {
       toast.error("Please provide the project name");
       return;
     }
@@ -84,7 +84,7 @@ const SemiContactedModal = ({
       
       // Prepare lead data as JSON string
       const leadData = {
-        projectName: formData.projectName.trim(),
+        propertyName: formData.propertyName.trim(),
         budget: formData.budget.trim(),
         firstCallDate: formData.firstCallDate
       };
@@ -154,7 +154,7 @@ const SemiContactedModal = ({
 
     // Apply input restrictions based on field type
     switch (field) {
-      case 'projectName':
+      case 'propertyName':
         processedValue = value;
         break;
 
@@ -220,8 +220,8 @@ const SemiContactedModal = ({
                </label>
                <Input
                  type="text"
-                 value={formData.projectName}
-                 onChange={(e) => handleInputChange('projectName', e.target.value)}
+                 value={formData.propertyName}
+                 onChange={(e) => handleInputChange('propertyName', e.target.value)}
                  placeholder="Enter project name"
                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                  required
@@ -306,7 +306,7 @@ const SemiContactedModal = ({
                      <button
              type="submit"
              onClick={handleSubmit}
-             disabled={isSubmitting || !formData.projectName.trim() || !floorPlanFile || !formData.budget.trim() || !formData.firstCallDate}
+             disabled={isSubmitting || !formData.propertyName.trim() || !floorPlanFile || !formData.budget.trim() || !formData.firstCallDate}
              className="px-6 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
            >
             {isSubmitting ? (

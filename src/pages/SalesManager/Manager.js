@@ -64,7 +64,7 @@ const defaultLeadData = {
   name: "",
   contactNumber: "",
   email: "",
-  projectType: "",
+  propertyType: "",
   propertyType: "",
   address: "",
   area: "",
@@ -193,6 +193,43 @@ const ManagerContent = ({ role }) => {
     } else {
       dispatch(fetchLeads());
     }
+  }, [dispatch, selectedEmployeeId, unassignedOnly]);
+
+  // Live refresh: periodically refetch leads and on window focus/visibility change
+  useEffect(() => {
+    const REFRESH_INTERVAL_MS = 2000; // 20s
+
+    const refetchLeads = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      const base = { silent: true };
+      if (unassignedOnly) {
+        dispatch(fetchLeads(base));
+      } else if (selectedEmployeeId && selectedEmployeeId !== "all") {
+        dispatch(fetchLeads({ employeeId: selectedEmployeeId, ...base }));
+      } else {
+        dispatch(fetchLeads(base));
+      }
+    };
+
+    const onFocus = () => refetchLeads();
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", onFocus);
+    }
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", refetchLeads);
+    }
+
+    const intervalId = setInterval(refetchLeads, REFRESH_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focus", onFocus);
+      }
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", refetchLeads);
+      }
+    };
   }, [dispatch, selectedEmployeeId, unassignedOnly]);
 
   // Deduplicate leads by leadId and add stage information - Manager specific
@@ -406,119 +443,7 @@ const ManagerContent = ({ role }) => {
     }
   };
 
-  // Drag-and-drop handler for Kanban board
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    if (!over || !active) {
-      return;
-    }
 
-    const leadId = active.id;
-    const newPipelineName = over.id;
-
-    if (!leadId || !newPipelineName) {
-      return;
-    }
-
-    // Find the new pipeline by name
-    const newPipeline = pipelines.find((p) => p.name === newPipelineName);
-
-    if (!newPipeline) {
-      return;
-    }
-
-    // Find the lead in the grouped format
-    let lead = null;
-    let currentPipelineId = null;
-    
-    // Check if leads is in the new grouped format
-    if (Array.isArray(leads) && leads.length > 0 && leads[0].stageId && leads[0].leads) {
-      // New format: find lead in grouped structure
-      for (const stageGroup of leads) {
-        const foundLead = stageGroup.leads.find(l => l.leadId === leadId);
-        if (foundLead) {
-          lead = foundLead;
-          currentPipelineId = stageGroup.stageId;
-          break;
-        }
-      }
-    } else {
-      // Old format: find lead directly
-      lead = leads.find((l) => l.leadId === leadId);
-      currentPipelineId = lead?.pipelineId || lead?.stageId;
-    }
-
-    if (!lead) {
-      return;
-    }
-
-    const newPipelineId = newPipeline.pipelineId || newPipeline.stageId;
-
-    if (String(currentPipelineId) !== String(newPipelineId)) {
-      // Check if moving from stage index 0 to stage index 1
-      // Log pipeline information for debugging
-      const currentPipelineIndex = pipelines.findIndex(p => 
-        p.pipelineId === currentPipelineId || p.stageId === currentPipelineId
-      );
-      const newPipelineIndex = pipelines.findIndex(p => 
-        p.pipelineId === newPipelineId || p.stageId === newPipelineId
-      );
-      
-      // Check for backward movement restriction
-      if (currentPipelineIndex > newPipelineIndex) {
-        toast.error("Lead cannot be moved backward in kanban board");
-        return;
-      }
-
-      // Check if moving to stages with specific form types
-      if (newPipeline.formType === "SEMI") {
-        setSelectedLeadForSemiContacted(lead);
-        setTargetPipelineIdForSemiContacted(newPipelineId);
-        setShowSemiContactedModal(true);
-        return;
-      }
-
-      if (newPipeline.formType === "POTENTIAL") {
-        setSelectedLeadForPotential(lead);
-        setTargetPipelineIdForPotential(newPipelineId);
-        setShowPotentialModal(true);
-        return;
-      }
-
-      if (newPipeline.formType === "HIGHPOTENTIAL") {
-        setSelectedLeadForHighPotential(lead);
-        setTargetPipelineIdForHighPotential(newPipelineId);
-        setShowHighPotentialModal(true);
-        return;
-      }
-
-      // If pipeline requires a form, open the modal instead of moving directly
-      if (newPipeline.formType === "CONVERTED") {
-        setSelectedLead({ ...lead, pipelineId: newPipelineId });
-        setShowConvertModal(true);
-        return;
-      } else if (newPipeline.formType === "JUNK") {
-        setSelectedLead({ ...lead, pipelineId: newPipelineId });
-        setShowJunkModal(true);
-        return;
-      } else if (newPipeline.formType === "LOST") {
-        setSelectedLead({ ...lead, pipelineId: newPipelineId });
-        setShowLostModal(true);
-        return;
-      } else if (newPipeline.formType === "ASSIGNED") {
-        setSelectedLeadForAssignment(lead);
-        setTargetPipelineId(newPipelineId);
-        setShowAssignModal(true);
-        return;
-      }
-
-      // Otherwise, move lead directly
-
-      dispatch(moveLeadToPipeline({ leadId, newPipelineId }));
-    } else {
-      toast.error("Pipeline is the same, no move needed");
-    }
-  };
 
   // Manager-specific handlers (retained from original)
   const handleEdit = (lead) => {
@@ -927,7 +852,7 @@ const ManagerContent = ({ role }) => {
                     .map((p) => p.name)}
                   kanbanStatuses={pipelines.filter(p => p.name.toLowerCase() !== 'assigned' && p.name.toLowerCase() !== 'freeze' && p.name.toLowerCase() !== 'lost' && p.name.toLowerCase() !== 'junk')}
                   onScheduleActivity={handleScheduleActivity}
-                  onDragEnd={handleDragEnd}
+
                   onTeamAssign={handleTeamAssign}
                   managerEmployees={managerEmployees || []}
                   allowAssignment={true}

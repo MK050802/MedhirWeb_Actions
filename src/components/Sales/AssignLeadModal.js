@@ -116,7 +116,7 @@ const AssignLeadModal = ({
               </div>
               <div>
                 <span className="font-medium text-gray-700">Project Type:</span>
-                <p className="text-gray-900">{leadData?.projectType || "N/A"}</p>
+                <p className="text-gray-900">{leadData?.propertyType || "N/A"}</p>
               </div>
             </div>
           </div>

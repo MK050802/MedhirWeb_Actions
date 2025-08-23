@@ -1018,7 +1018,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
         }
     }, [view, editingFormId, categories, forms, selectedCategory]);
 
-    // Ensure fields are properly mapped when form data is available
+    // Ensure fields are properly mapped when form data is available (only on initial load)
     useEffect(() => {
         if (view === 'edit' && editingFormId && forms && Array.isArray(forms) && forms.length > 0) {
             // Use the helper function to find the form by ID
@@ -1027,7 +1027,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                 const currentFieldsCount = fields.length;
                 const apiFieldsCount = form.fields.length;
                 
-                console.log('Checking fields mapping:', {
+                console.log('Checking fields mapping on form load:', {
                     currentFieldsCount,
                     apiFieldsCount,
                     hasFieldsMismatch: currentFieldsCount !== apiFieldsCount,
@@ -1035,18 +1035,19 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                     apiFields: form.fields
                 });
                 
-                // If fields count doesn't match, re-map the fields
-                if (currentFieldsCount !== apiFieldsCount) {
-                    console.log('Re-mapping fields due to count mismatch');
+                // Only re-map fields if we're loading the form for the first time or if fields are empty
+                // This prevents overriding user changes when they add/edit fields
+                if (currentFieldsCount === 0 || (currentFieldsCount !== apiFieldsCount && fields.every(field => !field.id?.includes('field_')))) {
+                    console.log('Re-mapping fields from API (initial load)');
                     const mappedFields = mapApiFieldsToFrontend(form.fields);
                     setFields(mappedFields);
                 }
-            } else if (form && (!form.fields || form.fields.length === 0)) {
-                console.log('Form has no fields, clearing fields state');
+            } else if (form && (!form.fields || form.fields.length === 0) && fields.length === 0) {
+                console.log('Form has no fields, ensuring fields state is clear');
                 setFields([]);
             }
         }
-    }, [view, editingFormId, forms, fields]);
+    }, [view, editingFormId, forms]);
 
     // Monitor fields state changes for debugging
     useEffect(() => {

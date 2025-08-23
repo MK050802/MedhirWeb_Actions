@@ -37,6 +37,9 @@ import {
   FaInfo,
   FaArrowRight,
   FaArrowLeft,
+  FaCheckCircle,
+  FaClipboardCheck,
+  FaCheckDouble,
 } from "react-icons/fa";
 import MainLayout from "@/components/MainLayout";
 import { toast } from "sonner";
@@ -70,7 +73,7 @@ const API_BASE_URL = publicRuntimeConfig.apiURL;
 
 // Add these lists for dropdowns/selects
 // Note: salesPersons and designers will be populated from Redux managerEmployees
-const projectTypes = [
+const propertyTypes = [
   "2BHK Flat",
   "3BHK Flat",
   "4BHK Flat",
@@ -115,8 +118,9 @@ function formatRelativeTime(date) {
 
 // --- Sub-components for the new UI ---
 
-const OdooHeader = ({ lead, pipelines, onStatusChange }) => {
+const SalesHeader = ({ lead, pipelines, onStatusChange }) => {
   const router = useRouter();
+  const [moveBucketOpen, setMoveBucketOpen] = useState(false);
 
   // Filter out LOST and JUNK stages
   const filteredPipelines = pipelines.filter(stage => stage.formType !== "LOST" && stage.formType !== "JUNK");
@@ -142,18 +146,18 @@ const OdooHeader = ({ lead, pipelines, onStatusChange }) => {
     Low: "bg-gray-100 text-gray-600",
   }[priorityLabel];
   return (
-    <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between">
+    <div className="sticky top-16 z-10 bg-white border-b border-gray-200 px-8 py-2 flex items-center justify-between">
       {/* Left Side */}
       <div className="flex-1 flex flex-col">
         <div className="flex items-center gap-2">
           <button className="text-sm text-gray-500 font-medium" onClick={() => router.back()}>
             <FaArrowLeft className="w-5 h-5" />
           </button>
-          <span className="text-2xl text-gray-800 font-semibold">
-            {lead.name} &ndash; {lead.projectType}
+          <span className="text-2xl mt-1 text-gray-800 font-semibold">
+            {lead.name} &ndash; {lead.propertyType}
           </span>
         </div>
-        <div className="flex items-center gap-6 mt-2 ml-8">
+        <div className="flex items-center gap-6 ml-8">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500 font-medium">Priority:</span>
             <span
@@ -185,47 +189,86 @@ const OdooHeader = ({ lead, pipelines, onStatusChange }) => {
               customLabel = "text-blue-600";
               baseCircle = "";
             }
-            return (
-              <React.Fragment key={stage.stageId}>
-                <div
-                  className="flex items-center gap-2 cursor-pointer"
-                  onClick={() => onStatusChange(stage.name)}
-                >
-                  {isCompleted ? (
-                    <FaCheck className="text-green-500" />
-                  ) : (
-                    <span
-                      className={`flex items-center justify-center rounded-full border w-5 h-5 text-xs font-bold ${baseCircle} ${customCircle}`}
-                    >
-                      {idx + 1}
-                    </span>
-                  )}
-                  <span
-                    className={`text-sm ${
-                      isActive || isCompleted ? "font-medium" : ""
-                    } ${
-                      customLabel ||
-                      (isActive || isCompleted
-                        ? "text-gray-800"
-                        : "text-gray-400")
-                    }`}
-                  >
-                    {stage.name}
-                  </span>
-                </div>
-                {idx < filteredPipelines.length - 1 && (
-                  <span className="text-gray-300">&gt;</span>
-                )}
-              </React.Fragment>
-            );
           })}
+        </div>
+        
+        {/* Move to Bucket Feature */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-600">Move to:</span>
+          <Select
+            value=""
+            open={moveBucketOpen}
+            onOpenChange={setMoveBucketOpen}
+            onValueChange={(stageId) => {
+              const selectedStage = pipelines.find(p => p.stageId === stageId);
+              if (selectedStage) {
+                onStatusChange(selectedStage.name);
+              }
+              setMoveBucketOpen(false);
+            }}
+          >
+            <SelectTrigger className="w-36 h-9 border-gray-300 text-sm rounded-md focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-blue-50 hover:bg-blue-100 border-blue-200">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                <span className="text-blue-700 font-medium">Move Bucket</span>
+              </div>
+            </SelectTrigger>
+            <SelectContent className="rounded-md shadow-lg max-h-60 overflow-y-auto w-64">
+              <div className="p-2 border-b border-gray-200">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Available Stages</span>
+              </div>
+              {pipelines.filter(stage => stage.stageId && stage.stageId !== "").map((stage) => {
+                const currentStageId = lead.stageId;
+                const isCurrentStage = stage.stageId === currentStageId;
+                const stageIcons = {
+                  'LOST': '❌',
+                  'JUNK': '🗑️',
+                  'CONVERTED': '✅',
+                  'ASSIGNED': '👥',
+                  'SEMI': '📞',
+                  'POTENTIAL': '⭐',
+                  'HIGHPOTENTIAL': '🌟'
+                };
+                
+                return (
+                  <SelectItem 
+                    key={stage.stageId} 
+                    value={stage.stageId}
+                    disabled={isCurrentStage}
+                    className={`${isCurrentStage ? 'bg-gray-100 text-gray-400' : 'hover:bg-blue-50'} py-2 px-3`}
+                  >
+                    <div className="flex items-center gap-3 w-full">
+                      <span className="text-lg">{stageIcons[stage.formType] || '📋'}</span>
+                      <div className="flex-1">
+                        <span className={`${isCurrentStage ? 'text-gray-400' : 'text-gray-900'} font-medium text-sm`}>
+                          {stage.name}
+                        </span>
+                        {stage.formType && (
+                          <span className="text-xs text-gray-500 block">
+                            {stage.formType.toLowerCase()}
+                          </span>
+                        )}
+                      </div>
+                      {isCurrentStage && (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
       </div>
     </div>
   );
 };
 
-const OdooDetailBody = ({
+const SalesDetailBody = ({
   lead,
   isEditing,
   setIsEditing,
@@ -245,12 +288,13 @@ const OdooDetailBody = ({
   setIsActivityModalOpen,
   activityLogs,
   activeRole,
+  setActivities,
+  setActivityLogs,
 }) => {
   const dispatch = useDispatch();
   const { employees: managerEmployees, loading: managerEmployeesLoading } =
     useSelector((state) => state.managerEmployee);
   const [activeTab, setActiveTab] = useState("activity");
-  const [isEditingContact, setIsEditingContact] = useState(false);
   const [noteContent, setNoteContent] = useState("");
   const [expandedActivities, setExpandedActivities] = useState({});
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -258,6 +302,53 @@ const OdooDetailBody = ({
   const [expandedNotes, setExpandedNotes] = useState({});
   const [notes, setNotes] = useState([]);
   const [fileModal, setFileModal] = useState({ open: false, url: null });
+  // Removed conversation logs composer state (now using simplified call summaries only)
+  // Notes + conversation type for integrated summaries
+  const [noteConvoType, setNoteConvoType] = useState("");
+  const [taskSourceText, setTaskSourceText] = useState("");
+  const [summariesCollapsed, setSummariesCollapsed] = useState(false);
+  
+  // Task management for summaries form
+  const [summaryTasks, setSummaryTasks] = useState([]);
+  const [showTaskInput, setShowTaskInput] = useState(false);
+  const [newTaskText, setNewTaskText] = useState("");
+  const [newTaskDueDate, setNewTaskDueDate] = useState("");
+
+
+  // Removed handleAddConversationLog (now using simplified notes system)
+
+  // Removed bulk task suggestion functions (now using simple single task creation per conversation)
+  
+  // Task management functions for summaries form
+  const handleAddSummaryTask = () => {
+    if (!newTaskText.trim()) return;
+    if (!newTaskDueDate) {
+      toast.error("Due date is required for next actions");
+      return;
+    }
+    
+    const newTask = {
+      id: Date.now(),
+      text: newTaskText.trim(),
+      dueDate: newTaskDueDate,
+      completed: false
+    };
+    
+    setSummaryTasks([...summaryTasks, newTask]);
+    setNewTaskText("");
+    setNewTaskDueDate("");
+    setShowTaskInput(false);
+  };
+  
+  const handleRemoveSummaryTask = (taskId) => {
+    setSummaryTasks(summaryTasks.filter(task => task.id !== taskId));
+  };
+  
+  const handleEditSummaryTask = (taskId, newText) => {
+    setSummaryTasks(summaryTasks.map(task => 
+      task.id === taskId ? { ...task, text: newText } : task
+    ));
+  };
 
   const token = getItemFromSessionStorage("token");
   const isManager = jwtDecode(token).roles.includes("MANAGER");
@@ -270,13 +361,29 @@ const OdooDetailBody = ({
   });
 
   const [projectFields, setProjectFields] = useState({});
+  const [inlineEditingField, setInlineEditingField] = useState(null);
+  // Contacted and Potential inline sections
+  const [contactedFields, setContactedFields] = useState({
+    floorPlan: lead.floorPlan || "",
+    firstCallDate: lead.firstCallDate || "",
+    estimatedBudget: lead.estimatedBudget || lead.budget || "",
+  });
+  const [potentialFields, setPotentialFields] = useState({
+    firstMeetingDate: lead.firstMeetingDate || "",
+    initialQuote: lead.initialQuote || lead.quotedAmount || "",
+    requirements: lead.requirements || "",
+  });
 
   // --- Assigned Team Edit State ---
   const [isEditingTeam, setIsEditingTeam] = useState(false);
   const [assignedSalesRep, setAssignedSalesRep] = useState("");
   const [assignedDesigner, setAssignedDesigner] = useState("");
+  const [salesDropdownOpen, setSalesDropdownOpen] = useState(false);
+  const [designerDropdownOpen, setDesignerDropdownOpen] = useState(false);
   const [assignedSalesRepId, setAssignedSalesRepId] = useState("");
   const [assignedDesignerId, setAssignedDesignerId] = useState("");
+  const [contactEditingField, setContactEditingField] = useState(null);
+  const [teamEditingField, setTeamEditingField] = useState(null);
 
   useEffect(() => {
     // Convert employee IDs to names for display
@@ -287,20 +394,34 @@ const OdooDetailBody = ({
     setAssignedDesigner(designerEmployee?.name || "");
     setAssignedSalesRepId(lead.salesRep || "");
     setAssignedDesignerId(lead.designer || "");
+    
+    // Initialize dropdown states - keep closed by default
+    setSalesDropdownOpen(false);
+    setDesignerDropdownOpen(false);
   }, [lead, managerEmployees]);
   // --- End Assigned Team Edit State ---
 
   useEffect(() => {
     setProjectFields({
-      projectType: lead.projectType || "",
+      name: lead.name || "",
+      propertyType: lead.propertyType || "",
       address: lead.address || "",
       area: lead.area || "",
-      budget: lead.budget || "",
       leadSource: lead.leadSource || "",
       referralName: lead.referralName || "",
       designStyle: lead.designStyle || "",
       designTimeline: lead.designTimeline || "",
       completionTimeline: lead.completionTimeline || "",
+    });
+    setContactedFields({
+      floorPlan: lead.floorPlan || "",
+      firstCallDate: lead.firstCallDate || "",
+      estimatedBudget: lead.estimatedBudget || lead.budget || "",
+    });
+    setPotentialFields({
+      firstMeetingDate: lead.firstMeetingDate || "",
+      initialQuote: lead.initialQuote || lead.quotedAmount || "",
+      requirements: lead.requirements || "",
     });
   }, [lead, isEditing]);
 
@@ -500,8 +621,6 @@ const OdooDetailBody = ({
       onFieldChange("contactNumber", contactFields.contactNumber.trim());
       onFieldChange("alternateContactNumber", contactFields.alternateContactNumber.trim());
       onFieldChange("email", contactFields.email.trim());
-      setIsEditingContact(false);
-      await dispatch(fetchLeadById(lead.leadId));
       toast.success("Contact details updated!");
     } catch (e) {
       console.error("Failed to update contact details:", e);
@@ -511,6 +630,19 @@ const OdooDetailBody = ({
 
   const handleProjectFieldChange = (field, value) => {
     setProjectFields((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleContactedFieldChange = (field, value) => {
+    // For files, store the file object temporarily for upload processing
+    if (field === "floorPlan" && value instanceof File) {
+      setContactedFields((prev) => ({ ...prev, [field]: value }));
+    } else {
+      setContactedFields((prev) => ({ ...prev, [field]: value }));
+    }
+  };
+
+  const handlePotentialFieldChange = (field, value) => {
+    setPotentialFields((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSaveProject = async () => {
@@ -538,6 +670,115 @@ const OdooDetailBody = ({
     }
   };
 
+  // Auto-save a single project field on blur/change
+  const saveProjectField = async (field, valueOverride) => {
+    try {
+      const value = valueOverride !== undefined ? valueOverride : projectFields[field];
+      const payload = {};
+      const numericFields = ["area", "budget"];
+      payload[field] = numericFields.includes(field) && value !== "" && value !== null && value !== undefined
+        ? Number(value)
+        : value;
+
+      await axios.put(`${API_BASE_URL}/leads/${lead.leadId}`, payload, {
+        headers: { Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}` },
+      });
+      // Optimistically update local lead display without refetch
+      Object.entries(payload).forEach(([k, v]) => onFieldChange(k, v));
+      toast.success("Saved");
+    } catch (e) {
+      console.error("Auto-save failed for", field, e);
+      toast.error("Failed to save. Please try again.");
+    }
+  };
+
+  const saveContactedField = async (field, fileValue) => {
+    try {
+      const value = fileValue || contactedFields[field];
+      
+      // Required validation for Estimated Budget
+      if (field === "estimatedBudget") {
+        if (value === undefined || value === null || String(value).trim() === "") {
+          toast.error("Estimated Budget is required");
+          return;
+        }
+      }
+
+      // Handle file upload for floor plan
+      if (field === "floorPlan" && value instanceof File) {
+        const formData = new FormData();
+        formData.append("floorPlan", value);
+        formData.append("leadId", lead.leadId);
+
+        await axios.put(`${API_BASE_URL}/leads/${lead.leadId}/upload-floor-plan`, formData, {
+          headers: { 
+            Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}`,
+            'Content-Type': 'multipart/form-data'
+          },
+        });
+        
+        // Update local state with file name
+        setContactedFields(prev => ({ ...prev, floorPlan: value.name }));
+        onFieldChange("floorPlan", value.name);
+        toast.success("Floor plan uploaded successfully");
+        return;
+      }
+
+      // Handle regular field updates
+      const payload = {};
+      const numericFields = ["estimatedBudget"]; 
+      payload[field] = numericFields.includes(field) && value !== "" && value !== null && value !== undefined
+        ? Number(value)
+        : value;
+      
+      // Map estimatedBudget to backend if it uses a different key
+      if (field === "estimatedBudget") {
+        payload.estimatedBudget = payload.estimatedBudget;
+      }
+      
+      await axios.put(`${API_BASE_URL}/leads/${lead.leadId}`, payload, {
+        headers: { Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}` },
+      });
+      Object.entries(payload).forEach(([k, v]) => onFieldChange(k, v));
+      toast.success("Saved");
+    } catch (e) {
+      console.error("Auto-save failed for contacted", field, e);
+      toast.error("Failed to save. Please try again.");
+    }
+  };
+
+  const savePotentialField = async (field) => {
+    try {
+      const value = potentialFields[field];
+      // Required validations for Potential fields
+      if (field === "initialQuote") {
+        if (value === undefined || value === null || String(value).trim() === "") {
+          toast.error("Initial Quotation is required");
+          return;
+        }
+      }
+      if (field === "requirements") {
+        if (!String(value || "").trim()) {
+          toast.error("Requirements are required");
+          return;
+        }
+      }
+      const payload = {};
+      const numericFields = ["initialQuote"];
+      payload[field] = numericFields.includes(field) && value !== "" && value !== null && value !== undefined
+        ? Number(value)
+        : value;
+      await axios.put(`${API_BASE_URL}/leads/${lead.leadId}`, payload, {
+        headers: { Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}` },
+      });
+      Object.entries(payload).forEach(([k, v]) => onFieldChange(k, v));
+      toast.success("Saved");
+    } catch (e) {
+      console.error("Auto-save failed for potential", field, e);
+      toast.error("Failed to save. Please try again.");
+    }
+  };
+
   const handleSaveTeam = async () => {
     try {
       const body = {};
@@ -549,7 +790,9 @@ const OdooDetailBody = ({
         },
       });
       setIsEditingTeam(false);
-      await dispatch(fetchLeadById(lead.leadId));
+      // Optimistic local update
+      if (assignedSalesRepId) onFieldChange("salesRep", assignedSalesRepId);
+      if (assignedDesignerId) onFieldChange("designer", assignedDesignerId);
       toast.success("Assigned team updated!");
     } catch (e) {
       console.error("Failed to update assigned team:", e);
@@ -594,7 +837,7 @@ const OdooDetailBody = ({
         combinedNotes = lead.notesList.map((n) => ({
           user: n.user || lead.name || "User",
           content: n.content,
-          time: n.time || n.createdAt || new Date(),
+          time: n.timestamp || n.createdAt || n.time || new Date(),
           noteId: n.noteId || n.id,
         }));
       }
@@ -612,14 +855,23 @@ const OdooDetailBody = ({
       "Save Note button pressed. Attempting to post note:",
       noteContent
     );
+    
+    // Make it compulsory to add at least one task for all summaries
+    if (summaryTasks.length === 0) {
+      toast.error("Please add at least one task before saving the summary");
+      return;
+    }
+    
     setNotesLoading(true);
+    const typeLabel = noteConvoType === 'PHONE_CALL' ? 'Phone' : noteConvoType === 'MEETING' ? 'Meeting' : '';
+    const contentToSave = typeLabel ? `[${typeLabel}] ${noteContent}` : noteContent;
     try {
       let newNote;
       if (editingNoteId) {
         // Edit note
         await axios.put(
           `${API_BASE_URL}/leads/${lead.leadId}/notes/${editingNoteId}`,
-          { content: noteContent },
+          { content: contentToSave },
           {
             headers: {
               Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}`,
@@ -629,14 +881,14 @@ const OdooDetailBody = ({
         // Update note in local state
         setNotes((prev) =>
           prev.map((n) =>
-            n.noteId === editingNoteId ? { ...n, content: noteContent } : n
+            n.noteId === editingNoteId ? { ...n, content: contentToSave } : n
           )
         );
       } else {
         // Add note
         const res = await axios.post(
           `${API_BASE_URL}/leads/${lead.leadId}/notes`,
-          { content: noteContent },
+          { content: contentToSave },
           {
             headers: {
               Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}`,
@@ -644,19 +896,128 @@ const OdooDetailBody = ({
           }
         );
         // Add new note to local state
+        const currentTime = new Date();
         newNote = {
           user: lead.name || "User",
-          content: noteContent,
-          time: new Date(),
+          content: contentToSave,
+          time: currentTime,
+          createdAt: currentTime.toISOString(),
+          timestamp: currentTime.toISOString(),
           noteId: res.data?.noteId || undefined,
         };
         setNotes((prev) => [newNote, ...prev]);
       }
+      
+      // Create tasks if any are added
+      if (summaryTasks.length > 0) {
+        for (const task of summaryTasks) {
+          try {
+            await axios.post(
+              `${API_BASE_URL}/leads/${lead.leadId}/activities`,
+              {
+                title: task.text,
+                description: `Task created from call summary: ${noteContent.slice(0, 100)}...`,
+                activityType: "TO-DO",
+                dueDate: task.dueDate,
+                assignee: null
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}`,
+                },
+              }
+            );
+          } catch (taskError) {
+            console.error("Failed to create task:", taskError);
+            toast.error(`Failed to create task: ${task.text}`);
+          }
+        }
+        // Clear tasks after creation
+        setSummaryTasks([]);
+        toast.success(`Summary saved with ${summaryTasks.length} task(s) created!`);
+      } else {
+        toast.success("Summary saved successfully!");
+      }
+      
       setNoteContent("");
+      setNoteConvoType("");
       setEditingNoteIdx(null);
       setEditingNoteId(null);
+      setShowTaskInput(false);
+      setNewTaskText("");
+      setNewTaskDueDate("");
+      
+      // Silent reload - refresh data without showing loading state
+      if (lead && lead.leadId) {
+        // Refresh lead data silently to get updated notes
+        const fetchLeadSilently = async () => {
+          try {
+            const token = getItemFromSessionStorage("token") || "";
+            const response = await axios.get(
+              `${API_BASE_URL}/leads/${lead.leadId}`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+            // Update lead data without showing loading
+            const updatedLead = response.data;
+            if (updatedLead.notesList) {
+              const combinedNotes = updatedLead.notesList.map((n) => ({
+                user: n.user || updatedLead.name || "User",
+                content: n.content,
+                time: n.timestamp || n.createdAt || n.time || new Date(),
+                noteId: n.noteId || n.id,
+              }));
+              setNotes(combinedNotes);
+            }
+          } catch (err) {
+            console.error("Silent lead refresh failed:", err);
+          }
+        };
+        
+        // Refresh activities silently
+        const fetchActivitiesSilently = async () => {
+          try {
+            const token = getItemFromSessionStorage("token") || "";
+            const response = await axios.get(
+              `${API_BASE_URL}/leads/${lead.leadId}/activities`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+            // Update activities state without showing loading
+            setActivities(response.data);
+          } catch (err) {
+            console.error("Silent activities refresh failed:", err);
+          }
+        };
+        
+        // Refresh activity logs silently
+        const fetchActivityLogsSilently = async () => {
+          try {
+            const token = getItemFromSessionStorage("token") || "";
+            const response = await axios.get(
+              `${API_BASE_URL}/leads/${lead.leadId}/activity-logs`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+            // Update activity logs state without showing loading
+            setActivityLogs(response.data);
+          } catch (err) {
+            console.error("Silent activity logs refresh failed:", err);
+          }
+        };
+        
+        // Execute silent refreshes
+        fetchLeadSilently();
+        fetchActivitiesSilently();
+        fetchActivityLogsSilently();
+      }
+      
     } catch (e) {
       console.error("Failed to save note:", e);
+      toast.error("Failed to save summary");
     }
     setNotesLoading(false);
   };
@@ -683,63 +1044,376 @@ const OdooDetailBody = ({
   const HISTORY_LIMIT = 5;
   const ACTIVITY_LOG_LIMIT = 5;
 
+  // Build conversation summary groups from activities (phone/meeting) and notes with [Phone]/[Meeting]
+  const todoActivities = (activities || []).filter(
+    (a) => (a.type && (a.type.toUpperCase() === "TO-DO" || a.type.toUpperCase() === "TODO"))
+  );
+  const convoActivities = (activities || []).filter(
+    (a) => a.type && (a.type.toUpperCase() === "PHONE_CALL" || a.type.toUpperCase() === "MEETING")
+  );
+  function parseNoteConversation(note) {
+    const content = note?.content || "";
+    const match = content.match(/^\[(Phone|Meeting)\]\s*/i);
+    if (!match) return null;
+    const type = match[1].toUpperCase() === 'PHONE' ? 'PHONE_CALL' : 'MEETING';
+    const summary = content.replace(/^\[(Phone|Meeting)\]\s*/i, "").trim();
+    return { 
+      type, 
+      summary, 
+      time: note.timestamp || note.createdAt || note.time || new Date() 
+    };
+  }
+  const convoFromNotes = (notes || [])
+    .map(parseNoteConversation)
+    .filter(Boolean);
+  // Create a normalized key to match tasks by details equality
+  const normalize = (s) => (s || "").trim();
+  const conversationGroups = [
+    ...convoActivities.map((a) => ({
+      type: a.type,
+      summary: a.details || a.title || "",
+      time: a.createdAt || a.updatedAt || new Date(),
+    })),
+    ...convoFromNotes,
+  ]
+    // de-duplicate by (type, summary)
+    .filter((item, index, arr) =>
+      index === arr.findIndex((x) => x.type === item.type && normalize(x.summary) === normalize(item.summary))
+    )
+    .map((c) => ({
+      ...c,
+      tasks: todoActivities.filter((t) => normalize(t.details || "") === normalize(c.summary)),
+    }))
+    // sort newest first (most recent at top)
+    .sort((a, b) => {
+      const timeA = new Date(a.time);
+      const timeB = new Date(b.time);
+      
+      // Handle invalid dates
+      if (isNaN(timeA.getTime())) return 1;
+      if (isNaN(timeB.getTime())) return -1;
+      
+      // Sort descending (newest first)
+      return timeB.getTime() - timeA.getTime();
+    });
+
   return (
-    <div className="flex-grow bg-gray-50 p-6">
+    <div className="flex-grow bg-gray-50 p-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          {/* Project Details */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Project Details
-              </h3>
-              {isEditing ? (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveProject}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-semibold shadow-sm hover:bg-blue-700"
-                  >
-                    <FaCheck /> Save
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md text-sm font-semibold shadow-sm hover:bg-gray-50"
+          {/* All Tasks Container */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-2.5">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-base font-semibold text-gray-800">Pending Tasks</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">
+                  {activities?.filter(a => a.status !== "done" && a.id && !deletedActivityIds.has(a.id)).length || 0} tasks
+                </span>
+                {/* <button
+                  onClick={() => {
+                    setEditingActivity(null);
+                    setIsActivityModalOpen(true);
+                  }}
+                  className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition text-sm"
+                  title="Add Activity"
                 >
-                  <FaPencilAlt className="w-3 h-3" /> Edit
-                </button>
+                  +
+                </button> */}
+              </div>
+            </div>
+            
+            <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+              {activities && activities.length > 0 ? (
+                activities
+                  .filter(
+                    (a) =>
+                      a.status !== "done" &&
+                      a.id &&
+                      !deletedActivityIds.has(a.id)
+                  )
+                  .map((activity, index) => (
+                    <div
+                      key={activity.id || `temp-${index}`}
+                      className="bg-gray-50 rounded-md border border-gray-200 p-1 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          {/* <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700 capitalize">
+                            {activity.type}
+                          </span> */}
+                          {/* <span className="text-blue-600 text-xs font-medium">
+                            {activity.status}
+                          </span> */}
+                        </div>
+                        <span className="font-medium text-gray-800 text-sm truncate">
+                          {activity.title}
+                        </span>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          {activity.dueDate && (
+                            <span>Due: {activity.dueDate}</span>
+                          )}
+                          {activity.details && (
+                            <span className="truncate">
+                              From: {activity.details.substring(0, 30)}...
+                            </span>
+                          )}
+                        </div> 
+                      </div>
+                      <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                        <button
+                          onClick={() => activity.id && onMarkDone(activity.id)}
+                          title="Mark as Done"
+                          className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
+                        >
+                          <FaCheck size={14} />
+                        </button>
+                        {/* <button
+                          onClick={() => onEditActivity(activity)}
+                          title="Edit"
+                          className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+                        >
+                          <FaPencilAlt size={14} />
+                        </button> */}
+                        <button
+                          onClick={() =>
+                            activity.id && onDeleteActivity(activity.id)
+                          }
+                          title="Delete"
+                          className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors"
+                        >
+                          <FaTimes size={14} />
+                        </button>
+                      </div>
+                      
+                      </div>
+                    </div>
+                  ))
+              ) : (
+                <div className="text-center text-sm text-gray-400 py-6">
+                  No pending tasks. Create tasks from your call summaries! 📋
+                </div>
               )}
+            </div>
+          </div>
+          
+          {/* Project Details */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Lead Details
+              </h3>
+              
+              {/* Assigned Team - Ultra Compact Design */}
+              <div className="flex items-center gap-4">
+                <span className="text-base font-medium text-gray-600">Team:</span>
+                <div className="flex items-center gap-3">
+                  {/* Sales Person */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm text-gray-500">Sales Person:</span>
+                    {(assignedSalesRepId || lead.salesRep) && !salesDropdownOpen ? (
+                      <button
+                        onClick={() => setSalesDropdownOpen(true)}
+                        className="px-2 py-1 h-7 border border-gray-300 rounded text-xs bg-white hover:bg-gray-50 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition-colors min-w-32 text-left"
+                      >
+                        {managerEmployees.find((emp) => emp.employeeId === (assignedSalesRepId || lead.salesRep))?.name || 
+                         (assignedSalesRepId || lead.salesRep) || "Select"}
+                      </button>
+                    ) : (
+                      <Select
+                        value={assignedSalesRepId || "unassigned"}
+                        open={salesDropdownOpen}
+                        onOpenChange={setSalesDropdownOpen}
+                        onValueChange={async (val) => {
+                          if (val === "unassigned") {
+                            setAssignedSalesRep("");
+                            setAssignedSalesRepId("");
+                            setSalesDropdownOpen(true); // Keep dropdown open for unassigned
+                          } else {
+                            const selectedEmployee = managerEmployees.find((emp) => emp.employeeId === val);
+                            setAssignedSalesRep(selectedEmployee?.name || "");
+                            setAssignedSalesRepId(val);
+                            setSalesDropdownOpen(false); // Close dropdown when assigned
+                          }
+                          await handleSaveTeam();
+                        }}
+                      >
+                        <SelectTrigger className="w-32 h-7 border-gray-300 text-xs rounded focus:ring-1 focus:ring-blue-400 focus:border-blue-400">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded shadow-lg">
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {managerEmployeesLoading ? (
+                            <SelectItem value="loading" disabled>Loading...</SelectItem>
+                          ) : (
+                            managerEmployees.filter(emp => emp.employeeId && emp.employeeId !== "").map((employee) => (
+                              <SelectItem key={employee.employeeId} value={employee.employeeId}>
+                                {employee.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  
+                  {/* Designer */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm text-gray-500">Designer:</span>
+                    {(assignedDesignerId || lead.designer) && !designerDropdownOpen ? (
+                      <button
+                        onClick={() => setDesignerDropdownOpen(true)}
+                        className="px-2 py-1 h-7 border border-gray-300 rounded text-xs bg-white hover:bg-gray-50 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition-colors min-w-32 text-left"
+                      >
+                        {managerEmployees.find((emp) => emp.employeeId === (assignedDesignerId || lead.designer))?.name || 
+                         (assignedDesignerId || lead.designer) || "Select"}
+                      </button>
+                    ) : (
+                      <Select
+                        value={assignedDesignerId || "unassigned"}
+                        open={designerDropdownOpen}
+                        onOpenChange={setDesignerDropdownOpen}
+                        onValueChange={async (val) => {
+                          if (val === "unassigned") {
+                            setAssignedDesigner("");
+                            setAssignedDesignerId("");
+                            setDesignerDropdownOpen(true); // Keep dropdown open for unassigned
+                          } else {
+                            const selectedEmployee = managerEmployees.find((emp) => emp.employeeId === val);
+                            setAssignedDesigner(selectedEmployee?.name || "");
+                            setAssignedDesignerId(val);
+                            setDesignerDropdownOpen(false); // Close dropdown when assigned
+                          }
+                          await handleSaveTeam();
+                        }}
+                      >
+                        <SelectTrigger className="w-32 h-7 border-gray-300 text-xs rounded focus:ring-1 focus:ring-blue-400 focus:border-blue-400">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded shadow-lg">
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {managerEmployees.filter(emp => emp.employeeId && emp.employeeId !== "").map((employee) => (
+                            <SelectItem key={employee.employeeId} value={employee.employeeId}>
+                              {employee.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
             {/* Single border below heading */}
             <div className="border-b border-gray-200 mb-4"></div>
+            {/* Contact Details (moved to top of this card) */}
+            <div className="border-b border-gray-100 pb-2 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-base font-semibold text-gray-800">Contact Details</h3>
+              </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-xs font-medium text-gray-500 mb-0">Full Name</label>
+                   {contactEditingField === 'name' ? (
+                     <input
+                       value={contactFields.name}
+                       onChange={(e) => handleContactFieldChange("name", e.target.value)}
+                       className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                       autoFocus
+                       onBlur={async () => { setContactEditingField(null); await handleSaveContact(); }}
+                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                       placeholder="Full Name"
+                     />
+                   ) : (
+                     <div className="flex items-center gap-3 text-gray-900 font-semibold cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors" onClick={() => { setContactEditingField('name'); }}>
+                       <FaUser className="text-gray-400" />
+                       <span>{(contactFields.name || "").trim() || "(click to add)"}</span>
+                     </div>
+                   )}
+                 </div>
+                 <div>
+                   <label className="block text-xs font-medium text-gray-500 mb-0">Email Address</label>
+                   {contactEditingField === 'email' ? (
+                     <input
+                       value={contactFields.email}
+                       onChange={(e) => handleContactFieldChange("email", e.target.value)}
+                       className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                       autoFocus
+                       onBlur={async () => { setContactEditingField(null); await handleSaveContact(); }}
+                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                       placeholder="Email (Optional)"
+                     />
+                   ) : (
+                     <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors" onClick={() => { setContactEditingField('email'); }}>
+                       <FaEnvelope className="text-gray-400" />
+                       <span className="text-gray-900 font-medium">{(contactFields.email || "").trim() || "(click to add)"}</span>
+                     </div>
+                   )}
+                 </div>
+                 <div>
+                   <label className="block text-xs font-medium text-gray-500 mb-0">Contact Number</label>
+                   {contactEditingField === 'contactNumber' ? (
+                     <input
+                       value={contactFields.contactNumber}
+                       onChange={(e) => handleContactFieldChange("contactNumber", e.target.value)}
+                       className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                       autoFocus
+                       onBlur={async () => { setContactEditingField(null); await handleSaveContact(); }}
+                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                       placeholder="Contact Number"
+                     />
+                   ) : (
+                     <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors" onClick={() => { setContactEditingField('contactNumber'); }}>
+                       <FaPhone className="text-gray-400" />
+                       <span className="text-gray-900 font-medium">
+                         {contactFields.contactNumber ? `+91 ${contactFields.contactNumber}` : "(click to add)"}
+                       </span>
+                     </div>
+                   )}
+                 </div>
+                 <div>
+                   <label className="block text-xs font-medium text-gray-500 mb-0">Alternate Phone Number</label>
+                   {contactEditingField === 'alternateContactNumber' ? (
+                     <input
+                       value={contactFields.alternateContactNumber}
+                       onChange={(e) => handleContactFieldChange("alternateContactNumber", e.target.value)}
+                       className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                       autoFocus
+                       onBlur={async () => { setContactEditingField(null); await handleSaveContact(); }}
+                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                       placeholder="Alternate Phone Number (Optional)"
+                     />
+                   ) : (
+                     <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors" onClick={() => { setContactEditingField('alternateContactNumber'); }}>
+                       <FaPhone className="text-gray-400" />
+                       <span className="text-gray-900 font-medium">
+                         {contactFields.alternateContactNumber ? `+91 ${contactFields.alternateContactNumber}` : "(click to add)"}
+                       </span>
+                     </div>
+                   )}
+                 </div>
+               </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-y-6 gap-x-8">
               {[
                 {
-                  label: "Project Name",
-                  field: "name",
+                  label: "Property Name",
+                  field: "propertyName",
                   type: "text",
                 },
                 {
-                  label: "Project Type",
-                  field: "projectType",
+                  label: "Property Type",
+                  field: "propertyType",
                   type: "select",
-                  options: projectTypes,
+                  options: propertyTypes,
                 },
-                { label: "Project Address", field: "address", type: "text" },
+                { label: "Address", field: "address", type: "text" },
                 {
                   label: "Area (sq. ft.)",
                   field: "area",
                   type: "number",
                 },
-                { label: "Estimated Budget", field: "budget", type: "number" },
                 {
                   label: "Design Timeline",
                   field: "designTimeline",
@@ -770,7 +1444,7 @@ const OdooDetailBody = ({
                       </span>
                     )}
                   </span>
-                  {isEditing ? (
+                  {isEditing || inlineEditingField === field ? (
                     type === "select" ? (
                       <select
                         value={projectFields[field] || ""}
@@ -778,6 +1452,8 @@ const OdooDetailBody = ({
                           handleProjectFieldChange(field, e.target.value)
                         }
                         className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-base"
+                        onBlur={() => { saveProjectField(field); setInlineEditingField(null); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
                       >
                         {options.map((opt) => (
                           <option key={opt} value={opt}>
@@ -793,6 +1469,9 @@ const OdooDetailBody = ({
                           handleProjectFieldChange(field, e.target.value)
                         }
                         className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-base"
+                        autoFocus={inlineEditingField === field}
+                        onBlur={() => { saveProjectField(field); setInlineEditingField(null); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
                       />
                     )
                   ) : (
@@ -818,19 +1497,22 @@ const OdooDetailBody = ({
                             }
                           : {}
                       }
+                    onClick={() => setInlineEditingField(field)}
                     >
-                      {field === "budget" && lead.budget ? (
+                      {field === "budget" && ((projectFields.budget ?? lead.budget)) ? (
                         <FaRupeeSign className="inline text-gray-400 text-sm mr-1" />
                       ) : null}
-                      {field === "budget" && lead.budget
-                        ? Number(lead.budget).toLocaleString("en-IN")
+                      {field === "budget"
+                        ? (projectFields.budget ?? lead.budget)
+                          ? Number(projectFields.budget ?? lead.budget).toLocaleString("en-IN")
+                          : "(click to add)"
                         : field === "area"
-                        ? lead.area
-                          ? `${lead.area} sq. ft.`
-                          : "N/A"
+                        ? (projectFields.area ?? lead.area)
+                          ? `${projectFields.area ?? lead.area} sq. ft.`
+                          : "(click to add)"
                         : field === "referralName"
-                        ? (lead.referralName || (lead.leadSource === "Referral" ? "Not specified" : "N/A"))
-                        : lead[field] || "N/A"}
+                        ? (projectFields.referralName ?? lead.referralName) || (lead.leadSource === "Referral" ? "Not specified" : "(click to add)")
+                        : (projectFields[field] ?? lead[field]) || "(click to add)"}
                     </div>
                   )}
                 </div>
@@ -866,1086 +1548,372 @@ const OdooDetailBody = ({
                   </div>
                 </div>
               )}
-            </div>
           </div>
 
-          {/* Tabs and Tab Content */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 min-h-[300px]">
-            <div className="border-b border-gray-200">
-              <nav className="flex space-x-6" aria-label="Tabs">
-                <button
-                  className={`pb-3 text-sm font-medium border-b-2 ${
-                    activeTab === "notes"
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-blue-600"
-                  }`}
-                  onClick={() => setActiveTab("notes")}
-                >
-                  Notes
-                </button>
-                <button
-                  className={`pb-3 text-sm font-medium border-b-2 ${
-                    activeTab === "activity"
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-blue-600"
-                  }`}
-                  onClick={() => setActiveTab("activity")}
-                >
-                  Activity Log
-                </button>
-                <button
-                  className={`pb-3 text-sm font-medium border-b-2 ${
-                    activeTab === "file"
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-blue-600"
-                  }`}
-                  onClick={() => setActiveTab("file")}
-                >
-                  Files
-                </button>
-                <button
-                  className={`pb-3 text-sm font-medium border-b-2 ${
-                    activeTab === "status"
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-blue-600"
-                  }`}
-                  onClick={() => setActiveTab("status")}
-                >
-                  Status Details
-                </button>
-                <button
-                  className={`pb-3 text-sm font-medium border-b-2 ${
-                    activeTab === "history"
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-blue-600"
-                  }`}
-                  onClick={() => setActiveTab("history")}
-                >
-                  Activity History
-                </button>
-              </nav>
-            </div>
-            <div className="pt-4">
-              {activeTab === "notes" && (
-                <div>
-                  <textarea
-                    value={noteContent}
-                    onChange={(e) => setNoteContent(e.target.value)}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Add a note..."
-                  />
-                  <div className="text-right mt-2 flex gap-2 justify-end items-center">
-                    <button
-                      onClick={handleAddOrEditNote}
-                      className="px-4 py-1.5 bg-blue-600 text-white rounded-md text-sm font-semibold"
-                      disabled={notesLoading || !(noteContent || "").trim()}
-                    >
-                      {editingNoteId ? "Edit Note" : "Save Note"}
-                    </button>
-                    {editingNoteId && (
-                      <button
-                        onClick={() => {
-                          setNoteContent("");
-                          setEditingNoteIdx(null);
-                          setEditingNoteId(null);
-                        }}
-                        className="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-md text-sm font-semibold"
-                      >
-                        Cancel
-                      </button>
+            {/* Contacted Section moved here above Potential */}
+            <div className="border-t border-gray-200 my-6"></div>
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Contacted</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Floor Plan</span>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf,.svg"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          handleContactedFieldChange('floorPlan', file);
+                          saveContactedField('floorPlan', file);
+                        }
+                      }}
+                      className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
+                    {contactedFields.floorPlan && typeof contactedFields.floorPlan === 'string' && (
+                      <div className="mt-2 text-xs text-gray-600">
+                        Current: {contactedFields.floorPlan}
+                      </div>
                     )}
                   </div>
-                  <div className="mt-4 space-y-4">
-                    {notes.map((note, idx) => (
-                      <div
-                        key={note.noteId || note.id || idx}
-                        className="cursor-pointer group"
-                        onClick={() => handleEditNoteClick(note, idx)}
-                      >
-                        <p className="font-semibold text-sm group-hover:text-blue-600">
-                          {note.user}{" "}
-                          <span className="text-xs text-gray-400 ml-2">
-                            {formatRelativeTime(note.time)}
-                          </span>
-                        </p>
-                        <div className="text-sm group-hover:text-blue-600">
-                          {renderNoteContent(note.content, `note-${note.noteId || idx}`)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
-              )}
-              {activeTab === "activity" && (
-                <div className="relative">
-                  {/* Single vertical line for the whole timeline, connecting all circles */}
-                  <div
-                    className="absolute left-5 top-0 w-1 h-full bg-gray-200 z-0"
-                    style={{ borderRadius: "1px" }}
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">First Call Date</span>
+                  <input
+                    type="datetime-local"
+                    value={contactedFields.firstCallDate}
+                    onChange={(e) => handleContactedFieldChange('firstCallDate', e.target.value)}
+                    onBlur={() => saveContactedField('firstCallDate')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
-                  <ul className="">
-                    {activities.length === 0 && (
-                      <li className="text-center text-gray-400 py-4">
-                        No completed activities yet.
-                      </li>
-                    )}
-                    {(() => {
-                      const completedActivities = activities
-                        .filter((a) => a.status === "done")
-                        .sort(
-                          (a, b) => {
-                            const dateA = new Date(`${a.dueDate}T${a.dueTime || '00:00'}`);
-                            const dateB = new Date(`${b.dueDate}T${b.dueTime || '00:00'}`);
-                            return dateB - dateA;
-                          }
-                        );
-                      
-                      const visibleActivities = showAllActivityLogs
-                        ? completedActivities
-                        : completedActivities.slice(0, ACTIVITY_LOG_LIMIT);
-                      
-                      return (
-                        <>
-                          {visibleActivities.map((activity, idx, arr) => {
-                        // Timeline dot and icon
-                        const dotClass = "border-green-200 bg-green-50";
-                        const icon = (
-                          <svg
-                            className="w-6 h-6 text-green-600"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        );
-
-                        // Activity type label for success only
-                        let activityTypeLabel = activity.type || "";
-                        if (activity.status === "done" && activity.type) {
-                          activityTypeLabel = `Activity_Completed : ${activity.type}`;
-                        }
-
-                        return (
-                          <li
-                            key={activity.id}
-                            className="flex items-start mb-8 relative"
-                            style={{ minHeight: "48px" }}
-                          >
-                            {/* Marker column: line and dot perfectly aligned */}
-                            <div
-                              className="relative flex flex-col items-center"
-                              style={{ width: "40px", minWidth: "40px" }}
-                            >
-                              <span
-                                className={`z-10 flex items-center justify-center rounded-full border-2 w-7 h-7 ${dotClass}`}
-                                style={{ left: "0px" }}
-                              >
-                                {icon}
-                              </span>
                             </div>
-                            {/* Timeline content */}
-                            <div className="flex-1 pl-2">
-                              {/* Activity type label for success only */}
-                              {activityTypeLabel && (
-                                <span className="text-xs font-semibold text-green-600 mb-0.5 block">
-                                  {activityTypeLabel}
-                                </span>
-                              )}
-                              <span className="font-semibold text-gray-900 ml-2">
-                                {activity.title}
-                              </span>
-                              <div className="text-xs text-gray-500 mb-2">
-                                {activity.dueDate
-                                  ? new Date(
-                                      activity.dueDate
-                                    ).toLocaleDateString("en-GB", {
-                                      day: "numeric",
-                                      month: "short",
-                                      year: "numeric",
-                                    })
-                                  : ""}
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Estimated Budget <span className="text-red-500">*</span></span>
+                  <input
+                    type="number"
+                    value={contactedFields.estimatedBudget}
+                    onChange={(e) => handleContactedFieldChange('estimatedBudget', e.target.value)}
+                    onBlur={() => saveContactedField('estimatedBudget')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="0"
+                    required
+                  />
                               </div>
-                              {activity.attachment && (
-                                <div className="text-sm mb-2">
-                                  <button
-                                    onClick={() => handleOpenFile(activity.attachment, activity.title)}
-                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    <span className="text-xs">View File</span>
-                                  </button>
-                                </div>
-                              )}
-                              {activity.notes && (
-                                <div className="text-sm">
-                                  <span className="font-semibold">Notes:</span>{" "}
-                                  {renderNoteContent(activity.notes, activity.id)}
-                                </div>
-                              )}
-                            </div>
-                          </li>
-                        );
-                      })}
-                          {/* View More / View Less button */}
-                          {completedActivities.length > ACTIVITY_LOG_LIMIT && !showAllActivityLogs && (
-                            <div className="flex justify-center mt-4">
-                              <button
-                                className="px-4 py-2 rounded bg-blue-100 text-blue-700 font-semibold hover:bg-blue-200 transition"
-                                onClick={() => setShowAllActivityLogs(true)}
-                              >
-                                View More
-                              </button>
-                            </div>
-                          )}
-                          {showAllActivityLogs && completedActivities.length > ACTIVITY_LOG_LIMIT && (
-                            <div className="flex justify-center mt-4">
-                              <button
-                                className="px-4 py-2 rounded bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition"
-                                onClick={() => setShowAllActivityLogs(false)}
-                              >
-                                View Less
-                              </button>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </ul>
-                </div>
-              )}
-              {activeTab === "file" && (
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    Files
-                  </h3>
-                  {activities
-                    .filter((activity) => activity.attachment)
-                    .sort((a, b) => {
-                      const dateA = new Date(`${a.dueDate}T${a.dueTime || '00:00'}`);
-                      const dateB = new Date(`${b.dueDate}T${b.dueTime || '00:00'}`);
-                      return dateB - dateA;
-                    })
-                    .map((activity) => (
-                      <div
-                        key={activity.id}
-                        className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3 mb-2 border"
-                      >
-                        <div className="flex items-center gap-3">
-                          {/* File Icon */}
-                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            {activity.attachment.toLowerCase().includes('.pdf') ? (
-                              <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                              </svg>
-                            ) : activity.attachment.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                              <svg className="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                              </svg>
-                            ) : (
-                              <svg className="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </div>
-                          
-                          {/* File Info */}
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-800 hover:text-blue-600 flex items-center gap-2">
-                              {activity.attachmentName || activity.attachment.split("/").pop()}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              Uploaded by {activity.user || "Unknown"}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-2">
-                          {/* View Button */}
-                          <button
-                            onClick={() => handleOpenFile(activity.attachment, activity.attachmentName || activity.attachment.split("/").pop())}
-                            className="text-blue-600 hover:text-blue-800 p-2"
-                            title="View File"
-                          >
-                            <FaFileAlt className="w-4 h-4" />
-                          </button>
-                          
-                          {/* Download Button */}
-                          <button
-                            onClick={() => handleDownloadFile(activity.attachment)}
-                            className="text-gray-500 hover:text-blue-600 p-2"
-                            title="Download File"
-                          >
-                            <FaDownload className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  {activities.filter((activity) => activity.attachment).length === 0 && (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500 text-lg">No files available</p>
-                      <p className="text-gray-400 text-sm mt-2">No attachments have been uploaded for this lead</p>
-                    </div>
-                  )}
-                </div>
-              )}
-              {activeTab === "status" && (
-                <>
-                  {/* Show only the current stage's details */}
-                  {lead.stageName &&
-                    lead.stageName.toLowerCase() === "converted" &&
-                    (lead.finalQuotation ||
-                    lead.signupAmount ||
-                    lead.paymentDate ||
-                    lead.paymentMode ||
-                    lead.panNumber ||
-                    lead.discount ||
-                    lead.paymentDetailsFileName ||
-                    lead.bookingFormFileName ||
-                    lead.initialQuote ||
-                    lead.designTimeline ||
-                    lead.completionTimeline ? (
-                      <>
-                        {/* <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                          Status Details
-                        </h3> */}
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                            {lead.stageName}
-                          </h3>
-                        </div>
-                        <div style={{ marginBottom: "1.5rem" }} />
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 1fr",
-                            gap: "1.5rem",
-                          }}
-                        >
-                          <div>
-                            <div>
-                              <strong>Initial Quoted Amount:</strong> ₹{" "}
-                              {lead.initialQuote || lead.quotedAmount || "N/A"}
-                            </div>
-                            <div>
-                              <strong>Final Quotation:</strong> ₹{" "}
-                              {lead.finalQuotation || "N/A"}
-                            </div>
-                            <div>
-                              <strong>Sign-up Amount:</strong> ₹{" "}
-                              {lead.signupAmount || "N/A"}
-                            </div>
-                            <div>
-                              <strong>Discount:</strong>{" "}
-                              {lead.discount || "N/A"}
-                            </div>
-                            <div>
-                              <strong>Payment Proof:</strong>{" "}
-                              {lead.paymentDetailsFileName ? (
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => handleOpenFile(lead.paymentDetailsFileName, lead.paymentDetailsFileName.split("/").pop())}
-                                    className="text-blue-600 hover:text-blue-800 text-sm underline"
-                                  >
-                                    {(() => {
-                                      const name = lead.paymentDetailsFileName
-                                        .split("/")
-                                        .pop();
-                                      return (
-                                        name.split("_").slice(2).join("_") ||
-                                        name
-                                      );
-                                    })()}
-                                  </button>
-                                  <button
-                                    onClick={() => handleDownloadFile(lead.paymentDetailsFileName)}
-                                    className="text-gray-500 hover:text-blue-600 p-1"
-                                    title="Download"
-                                  >
-                                    <FaDownload className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              ) : (
-                                "No file uploaded"
-                              )}
-                            </div>
-                          </div>
-                          <div>
-                            <div>
-                              <strong>Payment Date:</strong>{" "}
-                              {lead.paymentDate || "N/A"}
-                            </div>
-                            <div>
-                              <strong>Payment Mode:</strong>{" "}
-                              {lead.paymentMode || "N/A"}
-                            </div>
-                            <div>
-                              <strong>PAN Number:</strong>{" "}
-                              {lead.panNumber || "N/A"}
-                            </div>
-                            <div>
-                              <strong>Design Timeline:</strong>{" "}
-                              {lead.designTimeline || "N/A"}
-                            </div>
-                            <div>
-                              <strong>Completion Timeline:</strong>{" "}
-                              {lead.completionTimeline || "N/A"}
-                            </div>
-                            <div>
-                              <strong>Discount:</strong>{" "}
-                              {lead.discount || "N/A"}
-                            </div>
-                            <div>
-                              <strong>Booking Form:</strong>{" "}
-                              {lead.bookingFormFileName ? (
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => handleOpenFile(lead.bookingFormFileName, lead.bookingFormFileName.split("/").pop())}
-                                    className="text-blue-600 hover:text-blue-800 text-sm underline"
-                                  >
-                                    {(() => {
-                                      const name = lead.bookingFormFileName
-                                        .split("/")
-                                        .pop();
-                                      return (
-                                        name.split("_").slice(2).join("_") ||
-                                        name
-                                      );
-                                    })()}
-                                  </button>
-                                  <button
-                                    onClick={() => handleDownloadFile(lead.bookingFormFileName)}
-                                    className="text-gray-500 hover:text-blue-600 p-1"
-                                    title="Download"
-                                  >
-                                    <FaDownload className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              ) : (
-                                "No file uploaded"
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-center text-gray-400 py-4">
-                        No status details available.
-                      </p>
-                    ))}
-                  {lead.stageName &&
-                    lead.stageName.toLowerCase() === "junk" &&
-                    lead.reasonForJunk && (
-                      <>
-                        <h3 className="text-base font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                          JUNK REASON
-                        </h3>
-                        <div className="text-lg font-bold text-gray-900">
-                          {lead.reasonForJunk}
-                        </div>
-                      </>
-                    )}
-                  {lead.stageName &&
-                    lead.stageName.toLowerCase() === "lost" &&
-                    lead.reasonForLost && (
-                      <>
-                        <h3 className="text-base font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                          LOST REASON
-                        </h3>
-                        <div className="text-lg font-bold text-gray-900">
-                          {lead.reasonForLost}
-                        </div>
-                      </>
-                    )}
-                  {(!lead.stageName ||
-                    (lead.stageName.toLowerCase() === "converted" &&
-                      !(
-                        lead.finalQuotation ||
-                        lead.signupAmount ||
-                        lead.paymentDate ||
-                        lead.paymentMode ||
-                        lead.panNumber ||
-                        lead.discount ||
-                        lead.paymentDetailsFileName ||
-                        lead.bookingFormFileName ||
-                        lead.initialQuote ||
-                        lead.designTimeline ||
-                        lead.completionTimeline
-                      )) ||
-                    (lead.stageName.toLowerCase() === "junk" &&
-                      !lead.reasonForJunk) ||
-                    (lead.stageName.toLowerCase() === "lost" &&
-                      !lead.reasonForLost)) && (
-                    <p className="text-center text-gray-400 py-4">
-                      No status details available.
-                    </p>
-                  )}
-                </>
-              )}
-              {activeTab === "history" && (
-                <div className="relative">
-                  {(() => {
-                    const activityMap = new Map();
-                    const specialEvents = [];
-                    activityLogs
-                      .slice()
-                      .sort(
-                        (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-                      )
-                      .forEach((log) => {
-                        const action = (log.action || "").toLowerCase();
-                        if (
-                          action === "stage changed" ||
-                          action === "pipeline changed" ||
-                          action === "activity deleted"
-                        ) {
-                          specialEvents.push(log);
-                        } else if (log.activityId) {
-                          if (!activityMap.has(log.activityId)) {
-                            activityMap.set(log.activityId, log);
-                          } else {
-                            const existing = activityMap.get(log.activityId);
-                            if (
-                              existing.action !== "Activity completed" &&
-                              log.action === "Activity completed"
-                            ) {
-                              activityMap.set(log.activityId, log);
-                            }
-                          }
-                        } else {
-                          specialEvents.push(log);
-                        }
-                      });
-                    const merged = [
-                      ...specialEvents,
-                      ...Array.from(activityMap.values()),
-                    ].sort(
-                      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-                    );
-                    const visibleHistory = showAllHistory
-                      ? merged
-                      : merged.slice(0, HISTORY_LIMIT);
-                    return (
-                      <div className="">
-                        {/* Timeline vertical line, absolutely positioned in marker column */}
-                        <div
-                          className="absolute top-0 left-5 w-1 h-full bg-gray-200 z-0"
-                          style={{ borderRadius: "1px" }}
-                        />
-                        {visibleHistory.map((log, idx) => {
-                          // Activity type label logic
-                          let activityTypeLabel = log.activityType || "";
-                          if (
-                            ((log.action &&
-                              log.action.toLowerCase().includes("created")) ||
-                              (log.activityType &&
-                                log.activityType
-                                  .toLowerCase()
-                                  .includes("created"))) &&
-                            log.activityType &&
-                            log.activityType.toLowerCase() !== "created"
-                          ) {
-                            activityTypeLabel = `Activity_Created : ${log.activityType}`;
-                          }
-
-                          // Main text is always the activity title or fallback
-                          let mainText =
-                            log.metadata?.activityTitle ||
-                            log.details ||
-                            log.action ||
-                            "Activity";
-                          if (
-                            log.action &&
-                            log.action.toLowerCase() === "stage changed"
-                          ) {
-                            if (
-                              log.metadata &&
-                              log.metadata.oldStage &&
-                              log.metadata.newStage
-                            ) {
-                              mainText = `${log.metadata.oldStage} → ${log.metadata.newStage}`;
-                            } else {
-                              mainText = log.details || "Stage Changed";
-                            }
-                          } else if (
-                            log.action &&
-                            log.action.toLowerCase() === "pipeline changed"
-                          ) {
-                            if (
-                              log.metadata &&
-                              log.metadata.oldPipeline &&
-                              log.metadata.newPipeline
-                            ) {
-                              mainText = `${log.metadata.oldPipeline} → ${log.metadata.newPipeline}`;
-                            } else {
-                              mainText = log.details || "Pipeline Changed";
-                            }
-                          } else if (
-                            log.action &&
-                            log.action.toLowerCase() === "activity completed"
-                          ) {
-                            mainText =
-                              log.metadata?.activityTitle ||
-                              log.details ||
-                              "Activity Completed";
-                          } else if (
-                            log.action &&
-                            log.action.toLowerCase() === "activity deleted"
-                          ) {
-                            mainText =
-                              log.metadata?.activityTitle ||
-                              log.details ||
-                              "Activity Deleted";
-                          }
-
-                          // Dot color and icon logic
-                          let dotColor = "bg-blue-100 border-blue-500";
-                          let icon = (
-                            <FaInfo className="text-blue-500 w-3.5 h-3.5" />
-                          );
-                          if (
-                            log.action &&
-                            log.action.toLowerCase() === "activity completed"
-                          ) {
-                            dotColor = "bg-green-100 border-green-500";
-                            icon = (
-                              <FaCheck className="text-green-500 w-3.5 h-3.5" />
-                            );
-                          } else if (
-                            log.action &&
-                            log.action.toLowerCase() === "activity deleted"
-                          ) {
-                            dotColor = "bg-red-100 border-red-500";
-                            icon = (
-                              <FaTimes className="text-red-500 w-3.5 h-3.5" />
-                            );
-                          } else if (
-                            log.action &&
-                            (log.action.toLowerCase() === "stage changed" ||
-                              log.action.toLowerCase() === "pipeline changed")
-                          ) {
-                            dotColor = "bg-blue-100 border-blue-500";
-                            icon = (
-                              <FaArrowRight className="text-blue-500 w-3.5 h-3.5" />
-                            );
-                          } else if (
-                            (log.action &&
-                              log.action.toLowerCase().includes("created")) ||
-                            (log.activityType &&
-                              log.activityType
-                                .toLowerCase()
-                                .includes("created"))
-                          ) {
-                            dotColor = "bg-blue-100 border-blue-500";
-                            icon = (
-                              <FaRegClock className="text-blue-500 w-3.5 h-3.5" />
-                            );
-                          }
-
-                          return (
-                            <div
-                              key={log.id}
-                              className="flex items-start mb-8 relative"
-                              style={{ minHeight: "48px" }}
-                            >
-                              {/* Marker column: line and dot perfectly aligned */}
-                              <div
-                                className="relative flex flex-col items-center"
-                                style={{ width: "40px", minWidth: "40px" }}
-                              >
-                                <span
-                                  className={`z-10 flex items-center justify-center rounded-full border-2 w-7 h-7 ${dotColor}`}
-                                  style={{ left: "0px" }}
-                                >
-                                  {icon}
-                                </span>
-                              </div>
-                              {/* Timeline content */}
-                              <div className="flex-1 pl-2">
-                                {/* Activity type label if present */}
-                                {activityTypeLabel && (
-                                  <span
-                                    className={`text-xs font-semibold mb-0.5 block ${getActivityTypeColor(
-                                      log.activityType
-                                    )}`}
-                                  >
-                                    {activityTypeLabel}
-                                  </span>
-                                )}
-                                <span className="font-semibold text-gray-800 text-base">
-                                  {mainText}
-                                </span>
-                                <span className="text-xs text-gray-400 mt-1 block">
-                                  {new Date(log.timestamp).toLocaleDateString(
-                                    "en-GB",
-                                    {
-                                      day: "2-digit",
-                                      month: "short",
-                                      year: "numeric",
-                                    }
-                                  )}{" "}
-                                  {log.timestamp &&
-                                    new Date(log.timestamp).toLocaleTimeString(
-                                      [],
-                                      {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      }
-                                    )}
-                                </span>
-                                {/* Optional: show notes/content if present */}
-                                {log.metadata?.notes && (
-                                  <div className="text-sm text-gray-600 mt-1">
-                                    {renderNoteContent(log.metadata.notes, `history-${log.id || idx}`)}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                        {/* View More / View Less button */}
-                        {merged.length > HISTORY_LIMIT && !showAllHistory && (
-                          <div className="flex justify-center mt-2">
-                            <button
-                              className="px-4 py-2 rounded bg-blue-100 text-blue-700 font-semibold hover:bg-blue-200 transition"
-                              onClick={() => setShowAllHistory(true)}
-                            >
-                              View More
-                            </button>
-                          </div>
-                        )}
-                        {showAllHistory && merged.length > HISTORY_LIMIT && (
-                          <div className="flex justify-center mt-2">
-                            <button
-                              className="px-4 py-2 rounded bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition"
-                              onClick={() => setShowAllHistory(false)}
-                            >
-                              View Less
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
           </div>
         </div>
 
+            {/* Potential Section */}
+            <div className="border-t border-gray-200 my-6"></div>
+            <div className="mb-2">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Potential</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">First Meeting Date</span>
+                <input
+                    type="date"
+                    value={potentialFields.firstMeetingDate}
+                    onChange={(e) => handlePotentialFieldChange('firstMeetingDate', e.target.value)}
+                    onBlur={() => savePotentialField('firstMeetingDate')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Initial Quotation <span className="text-red-500">*</span></span>
+                <input
+                    type="number"
+                    value={potentialFields.initialQuote}
+                    onChange={(e) => handlePotentialFieldChange('initialQuote', e.target.value)}
+                    onBlur={() => savePotentialField('initialQuote')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col md:col-span-1">
+                  <span className="text-xs text-gray-500 mb-1">Requirements <span className="text-red-500">*</span></span>
+                <input
+                    type="text"
+                    value={potentialFields.requirements}
+                    onChange={(e) => handlePotentialFieldChange('requirements', e.target.value)}
+                    onBlur={() => savePotentialField('requirements')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="Enter requirements"
+                    required
+                  />
+              </div>
+                </div>
+                </div>
+            {/* Contact Details section duplicated earlier; removing this copy */}
+
+
+          </div>
+          </div>
+
         {/* Right Column */}
         <div className="flex flex-col gap-6">
-          {/* Contact Details */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-gray-800">
-                Contact Details
-              </h3>
+          {/* Call Summaries Section - Redesigned */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-base font-medium text-gray-900">Summaries</h3>
               <button
-                onClick={() => setIsEditingContact(!isEditingContact)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-50"
+                onClick={() => setSummariesCollapsed(!summariesCollapsed)}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                title={summariesCollapsed ? "Expand" : "Collapse"}
               >
-                <FaPencilAlt className="w-3 h-3" />{" "}
-                {isEditingContact ? "Cancel" : "Edit"}
-              </button>
-            </div>
-            <div className="border-b border-gray-200 mb-4"></div>
-            {isEditingContact ? (
-              <div className="space-y-3">
-                <input
-                  value={contactFields.name}
-                  onChange={(e) =>
-                    handleContactFieldChange("name", e.target.value)
-                  }
-                  className="w-full p-1 border-b"
-                  placeholder="Full Name"
-                />
-                <input
-                  value={contactFields.contactNumber}
-                  onChange={(e) =>
-                    handleContactFieldChange("contactNumber", e.target.value)
-                  }
-                  className="w-full p-1 border-b"
-                  placeholder="Contact Number"
-                />
-                <input
-                  value={contactFields.alternateContactNumber}
-                  onChange={(e) =>
-                    handleContactFieldChange("alternateContactNumber", e.target.value)
-                  }
-                  className="w-full p-1 border-b"
-                  placeholder="Alternate Phone Number (Optional)"
-                />
-                <input
-                  value={contactFields.email}
-                  onChange={(e) =>
-                    handleContactFieldChange("email", e.target.value)
-                  }
-                  className="w-full p-1 border-b"
-                  placeholder="Email (Optional)"
-                />
-                <button
-                  onClick={handleSaveContact}
-                  className="w-full mt-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-semibold"
+                <svg 
+                  className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${summariesCollapsed ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
                 >
-                  Save
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 text-gray-900 font-semibold">
-                  <FaUser className="text-gray-400" />
-                  <span>{lead.name || "N/A"}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <FaPhone className="text-gray-400" />
-                  <span className="text-gray-900 font-medium">
-                    {lead.contactNumber ? `+91 ${lead.contactNumber}` : "N/A"}
-                  </span>
-                </div>
-                {lead.alternateContactNumber && (
-                  <div className="flex items-center gap-3">
-                    <FaPhone className="text-gray-400" />
-                    <span className="text-gray-900 font-medium">
-                      {`+91 ${lead.alternateContactNumber}`}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center gap-3">
-                  <FaEnvelope className="text-gray-400" />
-                  <span className="text-gray-900 font-medium">
-                    {lead.email || "N/A"}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Assigned Team (always show, minimal style) */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-gray-800">
-                Assigned Team
-              </h3>
-              {isManager && (
-              <button
-                onClick={() => setIsEditingTeam(!isEditingTeam)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md text-sm font-semibold hover:bg-gray-50"
-              >
-                  <FaPencilAlt className="w-3 h-3" />{" "}
-                  {isEditingTeam ? "Cancel" : "Edit"}
-                </button>
-              )}
-            </div>
-            <div className="border-b border-gray-200 mb-4"></div>
-            {isEditingTeam ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sales Person
-                  </label>
-                  <Select
-                    value={assignedSalesRepId || "unassigned"}
-                    onValueChange={(val) => {
-                      if (val === "unassigned") {
-                        setAssignedSalesRep("");
-                        setAssignedSalesRepId("");
-                      } else {
-                        const selectedEmployee = managerEmployees.find(
-                          (emp) => emp.employeeId === val
-                        );
-                        setAssignedSalesRep(selectedEmployee?.name || "");
-                        setAssignedSalesRepId(val);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-full border-gray-300 text-sm rounded-md focus:ring-2 focus:ring-blue-400 focus:border-blue-400">
-                      <SelectValue placeholder="Unassigned" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-md shadow-lg">
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {managerEmployeesLoading ? (
-                        <SelectItem value="" disabled>
-                          Loading...
-                        </SelectItem>
-                      ) : (
-                        managerEmployees.map((employee) => (
-                          <SelectItem
-                            key={employee.employeeId}
-                            value={employee.employeeId}
-                          >
-                            {employee.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Designer
-                  </label>
-                  <Select
-                    value={assignedDesignerId || "unassigned"}
-                    onValueChange={(val) => {
-                      if (val === "unassigned") {
-                        setAssignedDesigner("");
-                        setAssignedDesignerId("");
-                      } else {
-                        const selectedEmployee = managerEmployees.find(
-                          (emp) => emp.employeeId === val
-                        );
-                        setAssignedDesigner(selectedEmployee?.name || "");
-                        setAssignedDesignerId(val);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-full border-gray-300 text-sm rounded-md focus:ring-2 focus:ring-blue-400 focus:border-blue-400">
-                      <SelectValue placeholder="Unassigned" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-md shadow-lg">
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {managerEmployees.map((employee) => (
-                        <SelectItem
-                          key={employee.employeeId}
-                          value={employee.employeeId}
-                        >
-                          {employee.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <button
-              onClick={handleSaveTeam}
-              className="w-full mt-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-semibold"
-            >
-              Save
-            </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500 text-sm">Sales Person:</span>
-                  <span
-                    className={
-                      lead.salesRep
-                        ? "font-semibold text-gray-900"
-                        : "text-gray-400 font-medium"
-                    }
-                  >
-                    {lead.salesRep ? 
-                      (managerEmployees.find(emp => emp.employeeId === lead.salesRep)?.name || lead.salesRep) 
-                      : "Unassigned"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500 text-sm">Designer:</span>
-                  <span
-                    className={
-                      lead.designer
-                        ? "font-semibold text-gray-900"
-                        : "text-gray-400 font-medium"
-                    }
-                  >
-                    {lead.designer ? 
-                      (managerEmployees.find(emp => emp.employeeId === lead.designer)?.name || lead.designer) 
-                      : "Unassigned"}
-                  </span>
-
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-gray-800">
-                Activity
-              </h3>
-              <button
-                onClick={() => {
-                  setEditingActivity(null);
-                  setIsActivityModalOpen(true);
-                }}
-                className="w-7 h-7 flex items-center justify-center rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition"
-                title="Add Activity"
-              >
-                +
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
             </div>
-            <div className="space-y-3">
-              {activities && activities.length > 0 ? (
-                activities
-                  .filter(
-                    (a) =>
-                      a.status !== "done" &&
-                      a.id &&
-                      !deletedActivityIds.has(a.id)
-                  )
-                  .map((activity, index) => (
-                    <div
-                      key={activity.id || `temp-${index}`}
-                      className="bg-gray-50 rounded-lg border border-gray-200 p-3 flex items-center justify-between"
-                    >
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-200 text-gray-700 capitalize">
-                            {activity.type}
-                          </span>
-                          <span className="text-blue-600 text-xs font-medium ml-2">
-                            {activity.status}
-                          </span>
+            
+            {summariesCollapsed && (
+              <div className="transition-all duration-300 ease-in-out">
+                {/* Call Type Selection - Bullet Options */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-2">Call Type</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { value: 'PHONE_CALL', icon: '📞', label: 'Phone Call', color: 'green' },
+                      { value: 'MEETING', icon: '🤝', label: 'Meeting', color: 'blue' },
+                      { value: 'EMAIL', icon: '📧', label: 'Email', color: 'orange' },
+                      { value: 'VIDEO_CALL', icon: '🎥', label: 'Video Call', color: 'purple' }
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setNoteConvoType(option.value)}
+                        className={`flex items-center gap-1 py-1 rounded-lg border transition-all duration-200 ${
+                          noteConvoType === option.value
+                            ? option.value === 'PHONE_CALL' ? 'border-green-400 bg-green-50 text-green-700' :
+                              option.value === 'MEETING' ? 'border-blue-400 bg-blue-50 text-blue-700' :
+                              option.value === 'EMAIL' ? 'border-orange-400 bg-orange-50 text-orange-700' :
+                              'border-purple-400 bg-purple-50 text-purple-700'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-600'
+                        }`}
+                      >
+                        <span className="text-sm">{option.icon}</span>
+                        <span className="text-xs font-medium">{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Summary Input Field */}
+                <div className="mb-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Call Summary</label>
+                  <textarea
+                    rows={4}
+                    value={noteContent}
+                    onChange={(e) => setNoteContent(e.target.value)}
+                    placeholder="Describe what happened during this conversation, key points discussed, decisions made..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900 placeholder-gray-400"
+                  />
+                </div>
+
+                {/* Tasks Section */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    Next Actions <span className="text-red-500">*</span>
+                  </label>
+                    
+                                      {/* Existing Tasks */}
+                  {summaryTasks.length > 0 ? (
+                    <div className="space-y-2 mb-3">
+                      {summaryTasks.map((task) => (
+                        <div key={task.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
+                          <div className="flex-1">
+                            <p className="text-xs text-gray-800">{task.text}</p>
+                            {task.dueDate && (
+                              <p className="text-xs text-gray-500">Due: {new Date(task.dueDate).toLocaleDateString()}</p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSummaryTask(task.id)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                            title="Remove task"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
                         </div>
-                        <span className="font-semibold text-gray-800 text-sm">
-                          {activity.title}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {activity.dueDate}
-                        </span>
+                      ))}
+                    </div>
+                  ) : !showTaskInput ? (
+                    <div className="text-center py-3 text-xs text-gray-500 bg-gray-50 rounded-md border border-gray-200">
+                      No Actions added yet. Click "+ Next Action" to add at least one.
+                    </div>
+                  ) : null}
+
+                    {/* Add Task Input */}
+                    {showTaskInput && (
+                      <div className="space-y-0 p-2 border border-gray-200 rounded-md bg-gray-50 grid grid-cols-2 gap-0">
+                        {/* Task Description - Full Width */}
+                        <div className="flex flex-col gap-2">
+                          <label className="block text-xs font-medium text-gray-700 mb-0">Task Description <span className="text-red-500">*</span></label>
+                        <div>
+                          <textarea
+                            rows={3}
+                            value={newTaskText}
+                            onChange={(e) => setNewTaskText(e.target.value)}
+                            placeholder="Enter task description..."
+                            className="w-full px-3 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                          />
+                        </div>
+                        </div>
+                        {/* Due Date and Buttons - Right Side */}
+                        <div className="flex justify-end">
+                          <div className="flex flex-col gap-2">
+                                                      <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Due Date <span className="text-red-500">*</span></label>
+                            <input
+                              type="date"
+                              value={newTaskDueDate}
+                              onChange={(e) => setNewTaskDueDate(e.target.value)}
+                              className="px-3 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              required
+                            />
+                          </div>
+                            <div className="flex gap-2">
+                                                          <button
+                              type="button"
+                              onClick={handleAddSummaryTask}
+                              disabled={!newTaskText.trim() || !newTaskDueDate}
+                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              Add Task
+                            </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowTaskInput(false);
+                                  setNewTaskText("");
+                                  setNewTaskDueDate("");
+                                }}
+                                className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs font-medium rounded-md transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 ml-4">
-                        <button
-                          onClick={() => activity.id && onMarkDone(activity.id)}
-                          title="Mark as Done"
-                          className="text-green-600 hover:text-green-800"
-                        >
-                          <FaCheck size={18} />
-                        </button>
-                        <button
-                          onClick={() => onEditActivity(activity)}
-                          title="Edit"
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          <FaPencilAlt size={18} />
-                        </button>
-                        <button
-                          onClick={() =>
-                            activity.id && onDeleteActivity(activity.id)
-                          }
-                          title="Delete"
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <FaTimes size={18} />
-                        </button>
+                    )}
+                  </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAddOrEditNote}
+                    disabled={notesLoading || !noteContent.trim() || !noteConvoType || summaryTasks.length === 0}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Save Summary
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowTaskInput(!showTaskInput)}
+                    className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-md transition-colors flex items-center gap-1"
+                  >
+                    + Next Action
+                  </button>
+                  
+                  {/* <button
+                    type="button"
+                    onClick={() => {
+                      setEditingActivity(null);
+                      setIsActivityModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-md transition-colors flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Add Activity
+                  </button> */}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Call History */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2.5">
+            <div className="mb-2">
+              <h3 className="text-md font-medium text-gray-900">Call History</h3>
+            </div>
+            
+            <div className="space-y-2">
+              {conversationGroups && conversationGroups.length > 0 ? (
+                conversationGroups.map((c, idx) => (
+                  <div key={idx} className="bg-white border border-gray-200 rounded-lg hover:shadow-md hover:border-gray-300 transition-all duration-200">
+                    {/* Header */}
+                    <div className="px-3 py-1.5 bg-gradient-to-r from-gray-50 to-white">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          <span className={`w-4 h-4 rounded flex items-center justify-center text-xs ${
+                            c.type === 'PHONE_CALL' ? 'bg-green-100 text-green-700' :
+                            c.type === 'MEETING' ? 'bg-blue-100 text-blue-700' :
+                            c.type === 'EMAIL' ? 'bg-orange-100 text-orange-700' :
+                            'bg-purple-100 text-purple-700'
+                          }`}>
+                            {c.type === 'PHONE_CALL' ? '📞' : 
+                             c.type === 'MEETING' ? '🤝' :
+                             c.type === 'EMAIL' ? '📧' : '🎥'}
+                          </span>
+                          <h4 className="font-semibold text-gray-900 text-sm">
+                            {c.type === 'PHONE_CALL' ? 'Phone Call' : 
+                             c.type === 'MEETING' ? 'Meeting' :
+                             c.type === 'EMAIL' ? 'Email' : 'Video Call'}
+                          </h4>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">
+                            {new Date(c.time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {new Date(c.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  ))
+                    
+                    {/* Content */}
+                    <div className="p-2">
+                      <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+                        {c.summary}
+                      </p>
+                    </div>
+                  </div>
+                ))
               ) : (
-                <div className="text-center text-sm text-gray-400 py-4">
-                  No pending activities.
+                <div className="text-center py-6">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-500 text-xs">No conversations yet</p>
+                  <p className="text-gray-400 text-xs">Add your first call summary above</p>
                 </div>
               )}
             </div>
           </div>
+
+
         </div>
       </div>
     </div>
@@ -2277,6 +2245,8 @@ const LeadDetailContent = () => {
     }
   };
 
+  // removed duplicate definition
+
   useEffect(() => {
     if (lead && lead.leadId) {
       fetchActivityLogs(lead.leadId);
@@ -2535,7 +2505,12 @@ const LeadDetailContent = () => {
     if (!activityToDelete) return;
     try {
       await axios.delete(
-        `${API_BASE_URL}/leads/${lead.leadId}/activities/${activityToDelete.id}`
+        `${API_BASE_URL}/leads/${lead.leadId}/activities/${activityToDelete.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}`,
+          },
+        }
       );
       await fetchActivities(lead.leadId); // Refresh activities
       await fetchActivityLogs(lead.leadId); // Refresh activity logs
@@ -2779,13 +2754,13 @@ const LeadDetailContent = () => {
           No pipeline stages found.
         </div>
       ) : (
-        <OdooHeader
+        <SalesHeader
           lead={updatedLead}
           pipelines={pipelines}
           onStatusChange={handleStatusChange}
         />
       )}
-      <OdooDetailBody
+      <SalesDetailBody
         lead={updatedLead}
         isEditing={isEditing}
         setIsEditing={setIsEditing}
@@ -2803,6 +2778,8 @@ const LeadDetailContent = () => {
         onDeleteActivity={handleDeleteActivity}
         onMarkDone={handleMarkDone}
         activityLogs={activityLogs}
+        setActivities={setActivities}
+        setActivityLogs={setActivityLogs}
       />
       <AdvancedScheduleActivityModal
         isOpen={isActivityModalOpen}

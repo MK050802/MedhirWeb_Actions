@@ -1,5 +1,4 @@
 import React from 'react';
-import { useDroppable } from '@dnd-kit/core';
 import { FaPlus, FaUsers } from 'react-icons/fa';
 import LeadCard from './LeadCard';
 
@@ -37,20 +36,10 @@ const KanbanColumn = ({
   allowAssignment = false,
   activeRoleTab,
 }) => {
-  const { setNodeRef, isOver } = useDroppable({
-    id: status,
-  });
-
   const showAddButton = false;
 
   return (
-    <div
-      ref={setNodeRef}
-      className={`
-        flex-1 min-w-[200px] max-w-[400px] h-full bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/60 transition-all duration-300 flex flex-col
-        ${isOver ? 'bg-blue-50/90 border-blue-300 shadow-xl scale-[1.02] ring-2 ring-blue-200/50' : 'hover:shadow-xl hover:bg-white/90'}
-      `}
-    >
+    <div className="flex-1 min-w-[200px] max-w-[400px] h-full bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/60 transition-all duration-300 flex flex-col hover:shadow-xl hover:bg-white/90">
       {/* Column Header - Fixed */}
       <div className="px-3 py-2.5 bg-gradient-to-r from-gray-50 to-white rounded-t-2xl border-b border-gray-100/60 flex-shrink-0">
         <div className="flex items-center justify-between mb-1.5">
@@ -87,10 +76,7 @@ const KanbanColumn = ({
       </div>
 
       {/* Column Content - Scrollable */}
-      <div className={`
-        flex-1 px-2.5 py-2.5 space-y-2 overflow-y-auto scrollbar-thin transition-all duration-300
-        ${isOver ? 'bg-blue-50/30' : 'bg-gray-50/30'}
-      `}>
+      <div className="flex-1 px-2.5 py-2.5 space-y-2 overflow-y-auto scrollbar-thin transition-all duration-300 bg-gray-50/30">
         {leads.map((lead) => (
           <LeadCard
             key={lead.leadId}
@@ -107,28 +93,30 @@ const KanbanColumn = ({
           />
         ))}
         
-        {/* Drop zone indicator */}
-        {isOver && leads.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-20 border-2 border-dashed border-blue-300 rounded-xl bg-blue-50/50 transition-all duration-200">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mb-1.5">
-              <FaPlus className="text-blue-600 text-xs" />
-            </div>
-            <span className="text-blue-600 text-xs font-medium">Drop lead here</span>
-            <span className="text-blue-400 text-xs mt-0.5">Move to {status}</span>
-          </div>
-        )}
-        
         {/* Empty state */}
-        {!isOver && leads.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-20 text-gray-400">
-            <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mb-1.5">
-              <FaUsers className="text-gray-400 text-xs" />
+        {leads.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+              <FaUsers className="text-gray-400 text-lg" />
             </div>
-            <span className="text-xs font-medium">No leads</span>
-            <span className="text-xs mt-0.5">Drag and drop leads here</span>
+            <p className="text-sm text-gray-500 font-medium mb-1">No leads yet</p>
+            <p className="text-xs text-gray-400">Leads will appear here when added to this stage</p>
           </div>
         )}
       </div>
+
+      {/* Add Lead Button (if enabled) */}
+      {showAddButton && onAddLead && (
+        <div className="p-2.5 border-t border-gray-100/60 flex-shrink-0">
+          <button
+            onClick={() => onAddLead(status)}
+            className="w-full px-3 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-700 text-sm font-medium rounded-xl hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 transition-all duration-200 flex items-center justify-center gap-2"
+          >
+            <FaPlus className="text-xs" />
+            Add Lead
+          </button>
+        </div>
+      )}
     </div>
   );
 };

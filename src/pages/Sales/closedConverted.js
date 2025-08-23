@@ -373,9 +373,6 @@ const ClosedConvertedPage = () => {
                         Client Name
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Project Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Project ID
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -402,9 +399,6 @@ const ClosedConvertedPage = () => {
                       >
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {lead.name || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {lead.projectName || 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {lead.projectId || 'N/A'}

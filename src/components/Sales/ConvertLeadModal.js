@@ -189,6 +189,12 @@ const ConvertLeadModal = ({ lead, onClose, onSuccess }) => {
       toast.error("Please fill in Sign-up Amount.");
       return;
     }
+    // Require payment date
+    if (!paymentDate || !paymentDate.trim()) {
+      toast.error("Please select Payment Date.");
+      return;
+    }
+
 
     // Validate signup amount
     const signupAmountValue = parseFloat(signupAmount.replace(/[^\d.]/g, ''));
@@ -333,6 +339,7 @@ const ConvertLeadModal = ({ lead, onClose, onSuccess }) => {
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
                 className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-400 focus:ring-blue-100 bg-gray-50 text-gray-800 placeholder-gray-400 transition-all py-2 px-3"
+                required
               />
             </div>
             <div>

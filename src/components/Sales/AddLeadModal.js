@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { FaRupeeSign } from 'react-icons/fa';
 
-const projectTypes = [
+const propertyTypes = [
   '2BHK Flat',
   '3BHK Flat',
   '4BHK Flat',
@@ -44,7 +44,7 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, initialData, isManagerView = 
     contactNumber: '',
     alternateContactNumber: '',
     email: '',
-    projectType: '',
+    propertyType: '',
     address: '',
     area: '',
     budget: '',
@@ -89,7 +89,7 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, initialData, isManagerView = 
         contactNumber: '',
         alternateContactNumber: '',
         email: '',
-        projectType: '',
+        propertyType: '',
         address: '',
         area: '',
         budget: '',
@@ -173,8 +173,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, initialData, isManagerView = 
     }
 
     // Project type validation
-    if (!formData.projectType) {
-      newErrors.projectType = 'Project type is required';
+    if (!formData.propertyType) {
+      newErrors.propertyType = 'Project type is required';
     }
 
     // Referral name validation - required if lead source is Referral
@@ -377,21 +377,21 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, initialData, isManagerView = 
                 Project Type <span className="text-blue-500 font-bold">*</span>
               </label>
               <Select
-                value={formData.projectType}
-                onValueChange={value => handleInputChange('projectType', value)}
+                value={formData.propertyType}
+                onValueChange={value => handleInputChange('propertyType', value)}
               >
-                <SelectTrigger className={`border-gray-300 text-xs rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-150 ${errors.projectType ? 'border-red-500' : ''} hover:border-blue-400` }>
+                <SelectTrigger className={`border-gray-300 text-xs rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-150 ${errors.propertyType ? 'border-red-500' : ''} hover:border-blue-400` }>
                   <SelectValue placeholder="Select project type" />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg shadow-lg">
-                  {projectTypes.map(type => (
+                  {propertyTypes.map(type => (
                     <SelectItem key={type} value={type} className="text-xs hover:bg-blue-50 focus:bg-blue-100 rounded-md">
                       {type}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {errors.projectType && <p className="text-red-500 text-xs mt-1">{errors.projectType}</p>}
+              {errors.propertyType && <p className="text-red-500 text-xs mt-1">{errors.propertyType}</p>}
               </div>
               <div> <label className="block text-xs font-medium text-gray-700 mb-1">
                   Lead Source <span className="text-blue-500 font-bold">*</span>

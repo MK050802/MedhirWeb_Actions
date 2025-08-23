@@ -106,7 +106,7 @@ const defaultLeadData = {
   name: "",
   contactNumber: "",
   email: "",
-  projectType: "",
+  propertyType: "",
   propertyType: "",
   address: "",
   area: "",
@@ -247,7 +247,7 @@ const MOCK_LEADS = [
     name: "John Doe",
     contactNumber: "1234567890",
     email: "john@example.com",
-    projectType: "Residential",
+    propertyType: "Residential",
     propertyType: "Apartment",
     address: "123 Main St",
     area: "1200",
@@ -298,7 +298,7 @@ const MOCK_LEADS = [
     name: "Jane Smith",
     contactNumber: "9876543210",
     email: "jane@example.com",
-    projectType: "Commercial",
+    propertyType: "Commercial",
     propertyType: "Office",
     address: "456 Market St",
     area: "2000",
@@ -349,7 +349,7 @@ const MOCK_LEADS = [
     name: "Emily Davis",
     contactNumber: "1112223333",
     email: "emily@example.com",
-    projectType: "Residential",
+    propertyType: "Residential",
     propertyType: "Villa",
     address: "789 Pine Ln",
     area: "2500",
@@ -957,7 +957,7 @@ const AutomationSettings = () => {
 
   const conditionFields = [
     { id: "leadSource", name: "Lead Source", type: "text" },
-    { id: "projectType", name: "Project Type", type: "text" },
+    { id: "propertyType", name: "Project Type", type: "text" },
     { id: "budget", name: "Budget", type: "number" },
     { id: "status", name: "Status", type: "text" },
     { id: "rating", name: "Rating", type: "number" },
@@ -1406,7 +1406,7 @@ const TemplatesSettings = () => {
     "{name}",
     "{email}",
     "{phone}",
-    "{projectType}",
+    "{propertyType}",
     "{budget}",
     "{address}",
     "{salesRep}",
@@ -3566,40 +3566,7 @@ const SettingContent = ({ role }) => {
     }
   };
 
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) {
-      console.log("DragEnd: No valid drop target or same position", {
-        active,
-        over,
-      });
-      return;
-    }
-    const leadId = active.id;
-    const newStatus = over.id;
-    const oldLead = dedupedLeads.find((l) => l.leadId === leadId);
-    console.log("DragEnd:", { leadId, newStatus, oldLead });
-    if (newStatus === "Converted") {
-      setPendingConversion({ lead: oldLead, fromStatus: oldLead.status });
-      setLeadToConvertId(leadId);
-      setShowConvertModal(true);
-      console.log("Opening Convert Modal", { leadId, newStatus });
-    } else if (newStatus === "Lost") {
-      setPendingLost({ lead: oldLead, fromStatus: oldLead.status });
-      setLeadToMarkLost(oldLead);
-      setShowLostReasonModal(true);
-      console.log("Opening Lost Modal", { leadId, newStatus });
-    } else if (newStatus === "Junk") {
-      setPendingJunk({ lead: oldLead, fromStatus: oldLead.status });
-      setLeadToMarkJunkId(leadId);
-      setShowJunkReasonModal(true);
-      console.log("Opening Junk Modal", { leadId, newStatus });
-    } else {
-      // For other status changes, dispatch an update action
-      dispatch(updateLead({ ...oldLead, status: newStatus }));
-      console.log("Moved lead to new status", { leadId, newStatus });
-    }
-  };
+
 
   const handleEdit = (lead) => {
     setEditingLead(lead);
@@ -3977,7 +3944,7 @@ const SettingContent = ({ role }) => {
             <KanbanBoard
               leadsByStatus={leadsByStatus}
               kanbanStatuses={kanbanStatuses}
-              onDragEnd={handleDragEnd}
+
               onEdit={handleEdit}
               onConvert={handleConvert}
               onMarkLost={handleMarkLost}
