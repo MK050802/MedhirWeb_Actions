@@ -75,6 +75,29 @@ export const updatePurchaseOrder = createAsyncThunk(
     }
 );
 
+// fetch purchase orders of vendor
+export const fetchPurchaseOrdersOfVendor = createAsyncThunk(
+    "vendorPurchaseOrders/fetchPurchaseOrdersOfVendor",
+    async ({ vendorId, companyId }, { rejectWithValue }) => {
+        try {
+            const token = getItemFromSessionStorage("token", null);
+            const response = await fetch(`${API_BASE_URL}?companyId=${companyId}&vendorId=${vendorId}`, {
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                return rejectWithValue(data.message || "Something went wrong");
+            }
+            return { vendorId, purchaseOrders: data };
+        } catch (error) {
+            return rejectWithValue(error.message || "Network Error");
+        }
+    }
+);
+
 // Purchase Order Numbering Thunks
 export const getNextPurchaseOrderNumber = createAsyncThunk(
   "purchase-orders/getNextPurchaseOrderNumber",
@@ -122,6 +145,7 @@ export const purchaseOrderSlice = createSlice({
     name: "purchase-orders",
     initialState: {
         purchaseOrders: [],
+        vendorPurchaseOrders: {}, // Store vendor purchase orders by vendorId
         loading: false,
         error: null,
         nextPurchaseOrderNumber: null,
@@ -160,6 +184,18 @@ export const purchaseOrderSlice = createSlice({
             }
         });
         builder.addCase(updatePurchaseOrder.rejected, (state, action) => {
+            state.loading = false;
+            state.error = action.payload;
+        });
+        builder.addCase(fetchPurchaseOrdersOfVendor.pending, (state) => {
+            state.loading = true;
+            state.error = null;
+        });
+        builder.addCase(fetchPurchaseOrdersOfVendor.fulfilled, (state, action) => {
+            state.loading = false;
+            state.vendorPurchaseOrders[action.payload.vendorId] = action.payload.purchaseOrders;
+        });
+        builder.addCase(fetchPurchaseOrdersOfVendor.rejected, (state, action) => {
             state.loading = false;
             state.error = action.payload;
         });

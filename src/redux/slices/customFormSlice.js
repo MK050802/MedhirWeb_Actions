@@ -150,12 +150,33 @@ export const fetchCustomForms = createAsyncThunk(
       }
       
       // Map _id to id for consistency - prioritize custom formId over MongoDB _id
-      const mappedForms = forms.map(form => ({
-        ...form,
-        id: form.formId || form.id,
-        name: form.name || form.title,
-        enabled: form.enabled !== undefined ? form.enabled : form.isActive !== undefined ? form.isActive : true
-      }));
+      const mappedForms = forms.map(form => {
+        // Map backend field structure to frontend expected structure if available
+        let mappedFields = form.fields;
+        if (form.fields && Array.isArray(form.fields)) {
+          mappedFields = form.fields.map(field => ({
+            id: field.id,
+            name: field.fieldName || field.name,
+            type: field.fieldType || field.type,
+            required: field.required !== undefined ? field.required : false,
+            placeholder: field.defaultValue || field.placeholder || '',
+            dropdownOptions: field.dropdownOptions || field.options || [],
+            label: field.fieldLabel || field.label || field.name,
+            order: field.fieldOrder || field.order || 1,
+            active: field.active !== undefined ? field.active : true
+          }));
+        }
+        
+        return {
+          ...form,
+          id: form.formId || form.id,
+          name: form.name || form.title,
+          enabled: form.enabled !== undefined ? form.enabled : form.isActive !== undefined ? form.isActive : true,
+          fields: mappedFields,
+          categoryId: form.assignedCategoryId || form.categoryId,
+          subCategoryId: form.assignedSubCategoryId || form.subCategoryId
+        };
+      });
       
       return mappedForms;
     } catch (error) {
@@ -221,12 +242,33 @@ export const fetchCustomFormsBySubCategory = createAsyncThunk(
       }
       
       // Map _id to id for consistency - prioritize custom formId over MongoDB _id
-      const mappedForms = forms.map(form => ({
-        ...form,
-        id: form.formId || form.id,
-        name: form.name || form.title,
-        enabled: form.enabled !== undefined ? form.enabled : form.isActive !== undefined ? form.isActive : true
-      }));
+      const mappedForms = forms.map(form => {
+        // Map backend field structure to frontend expected structure if available
+        let mappedFields = form.fields;
+        if (form.fields && Array.isArray(form.fields)) {
+          mappedFields = form.fields.map(field => ({
+            id: field.id,
+            name: field.fieldName || field.name,
+            type: field.fieldType || field.type,
+            required: field.required !== undefined ? field.required : false,
+            placeholder: field.defaultValue || field.placeholder || '',
+            dropdownOptions: field.dropdownOptions || field.options || [],
+            label: field.fieldLabel || field.label || field.name,
+            order: field.fieldOrder || field.order || 1,
+            active: field.active !== undefined ? field.active : true
+          }));
+        }
+        
+        return {
+          ...form,
+          id: form.formId || form.id,
+          name: form.name || form.title,
+          enabled: form.enabled !== undefined ? form.enabled : form.isActive !== undefined ? form.isActive : true,
+          fields: mappedFields,
+          categoryId: form.assignedCategoryId || form.categoryId,
+          subCategoryId: form.assignedSubCategoryId || form.subCategoryId
+        };
+      });
       
       return { subCategoryId, forms: mappedForms };
     } catch (error) {
@@ -266,8 +308,14 @@ export const fetchFormFields = createAsyncThunk(
       const mappedFields = fields.map(field => ({
         ...field,
         id: field.fieldId || field.id,
-        name: field.name || field.title,
-        required: field.required !== undefined ? field.required : false
+        name: field.fieldName || field.name || field.title,
+        type: field.fieldType || field.type,
+        required: field.required !== undefined ? field.required : false,
+        placeholder: field.defaultValue || field.placeholder || '',
+        dropdownOptions: field.dropdownOptions || field.options || [],
+        label: field.fieldLabel || field.label || field.name,
+        order: field.fieldOrder || field.order || 1,
+        active: field.active !== undefined ? field.active : true
       }));
       
       return { formId, fields: mappedFields };
@@ -297,13 +345,55 @@ export const createCustomForm = createAsyncThunk(
         companyId: companyId,
         categoryId: formData.categoryId,
         enabled: formData.enabled !== undefined ? formData.enabled : true,
-        fields: formData.fields.map(field => ({
-          name: field.name,
-          type: field.type,
-          required: field.required !== undefined ? field.required : false,
-          placeholder: field.placeholder || '',
-          options: field.options || []
-        })),
+        fields: formData.fields.map(field => {
+          const processedField = {
+            name: field.name,
+            type: field.type,
+            required: field.required !== undefined ? field.required : false,
+            placeholder: field.placeholder || '',
+          };
+          
+          // For dropdown fields, always ensure dropdownOptions exists
+          if (field.type === 'dropdown') {
+            // Check all possible sources for dropdown options
+            let dropdownOptions = [];
+            
+            if (field.dropdownOptions && Array.isArray(field.dropdownOptions)) {
+              dropdownOptions = field.dropdownOptions;
+            } else if (field.options && Array.isArray(field.options)) {
+              dropdownOptions = field.options;
+            } else if (field.dropdownOptions && typeof field.dropdownOptions === 'string') {
+              // Handle case where dropdownOptions might be a string that needs parsing
+              try {
+                dropdownOptions = JSON.parse(field.dropdownOptions);
+              } catch (e) {
+                console.warn('Failed to parse dropdownOptions string:', field.dropdownOptions);
+                dropdownOptions = [];
+              }
+            } else if (field.options && typeof field.options === 'string') {
+              // Handle case where options might be a string that needs parsing
+              try {
+                dropdownOptions = JSON.parse(field.options);
+              } catch (e) {
+                console.warn('Failed to parse options string:', field.options);
+                dropdownOptions = [];
+              }
+            }
+            
+            // Ensure we always have an array
+            if (!Array.isArray(dropdownOptions)) {
+              console.warn('dropdownOptions is not an array, converting to empty array');
+              dropdownOptions = [];
+            }
+            
+            processedField.dropdownOptions = dropdownOptions;
+          } else if (field.options) {
+            // For non-dropdown fields, include options if they exist
+            processedField.options = field.options;
+          }
+          
+          return processedField;
+        }),
         ...(formData.subCategoryId && { subCategoryId: formData.subCategoryId })
       };
       
@@ -328,6 +418,9 @@ export const createCustomForm = createAsyncThunk(
       let createdForm = null;
       if (response.data && response.data.data) {
         createdForm = response.data.data;
+      } else if (response.data && response.data.form) {
+        // Handle the new response structure with form object
+        createdForm = response.data.form;
       } else if (response.data && response.data.success) {
         // If backend only returns success message, create a mock form for UI
         createdForm = {
@@ -353,12 +446,31 @@ export const createCustomForm = createAsyncThunk(
         console.warn('Backend did not return proper formId, generated:', finalFormId);
       }
       
+      // Map backend field structure to frontend expected structure if available
+      let mappedFields = formData.fields;
+      if (createdForm.fields && Array.isArray(createdForm.fields)) {
+        mappedFields = createdForm.fields.map(field => ({
+          id: field.id,
+          name: field.fieldName || field.name,
+          type: field.fieldType || field.type,
+          required: field.required !== undefined ? field.required : false,
+          placeholder: field.defaultValue || field.placeholder || '',
+          dropdownOptions: field.dropdownOptions || field.options || [],
+          label: field.fieldLabel || field.label || field.name,
+          order: field.fieldOrder || field.order || 1,
+          active: field.active !== undefined ? field.active : true
+        }));
+      }
+      
       return {
         ...createdForm,
         id: finalFormId, // Always use proper formId, never MongoDB _id
         formId: finalFormId, // Always use proper formId, never MongoDB _id
         name: createdForm.name || createdForm.title,
-        enabled: createdForm.enabled !== undefined ? createdForm.enabled : createdForm.isActive !== undefined ? createdForm.isActive : true
+        enabled: createdForm.enabled !== undefined ? createdForm.enabled : createdForm.isActive !== undefined ? createdForm.isActive : true,
+        fields: mappedFields,
+        categoryId: createdForm.assignedCategoryId || createdForm.categoryId || formData.categoryId,
+        subCategoryId: createdForm.assignedSubCategoryId || createdForm.subCategoryId || formData.subCategoryId
       };
     } catch (error) {
       console.error('Redux: Error creating custom form:', error);
@@ -421,13 +533,55 @@ export const updateCustomForm = createAsyncThunk(
         companyId: companyId,
         categoryId: formData.categoryId,
         enabled: formData.enabled !== undefined ? formData.enabled : true,
-        fields: formData.fields.map(field => ({
-          name: field.name,
-          type: field.type,
-          required: field.required !== undefined ? field.required : false,
-          placeholder: field.placeholder || '',
-          options: field.options || []
-        })),
+        fields: formData.fields.map(field => {
+          const processedField = {
+            name: field.name,
+            type: field.type,
+            required: field.required !== undefined ? field.required : false,
+            placeholder: field.placeholder || '',
+          };
+          
+          // For dropdown fields, always ensure dropdownOptions exists
+          if (field.type === 'dropdown') {
+            // Check all possible sources for dropdown options
+            let dropdownOptions = [];
+            
+            if (field.dropdownOptions && Array.isArray(field.dropdownOptions)) {
+              dropdownOptions = field.dropdownOptions;
+            } else if (field.options && Array.isArray(field.options)) {
+              dropdownOptions = field.options;
+            } else if (field.dropdownOptions && typeof field.dropdownOptions === 'string') {
+              // Handle case where dropdownOptions might be a string that needs parsing
+              try {
+                dropdownOptions = JSON.parse(field.dropdownOptions);
+              } catch (e) {
+                console.warn('Failed to parse dropdownOptions string:', field.dropdownOptions);
+                dropdownOptions = [];
+              }
+            } else if (field.options && typeof field.options === 'string') {
+              // Handle case where options might be a string that needs parsing
+              try {
+                dropdownOptions = JSON.parse(field.options);
+              } catch (e) {
+                console.warn('Failed to parse options string:', field.options);
+                dropdownOptions = [];
+              }
+            }
+            
+            // Ensure we always have an array
+            if (!Array.isArray(dropdownOptions)) {
+              console.warn('dropdownOptions is not an array, converting to empty array');
+              dropdownOptions = [];
+            }
+            
+            processedField.dropdownOptions = dropdownOptions;
+          } else if (field.options) {
+            // For non-dropdown fields, include options if they exist
+            processedField.options = field.options;
+          }
+          
+          return processedField;
+        }),
         ...(formData.subCategoryId && { subCategoryId: formData.subCategoryId })
       };
       
@@ -450,7 +604,8 @@ export const updateCustomForm = createAsyncThunk(
         console.warn('Update: Invalid formId provided, generated:', finalFormId);
       }
       
-      return {
+      // Check if response contains the updated form data
+      let updatedFormData = {
         id: finalFormId, // Use the same ID for consistency
         formId: finalFormId, // Always use proper formId format
         name: formData.name,
@@ -460,6 +615,40 @@ export const updateCustomForm = createAsyncThunk(
         fields: formData.fields,
         updatedAt: new Date().toISOString()
       };
+      
+      // If response contains form data, use it instead of the request data
+      if (response.data && response.data.form) {
+        const backendForm = response.data.form;
+        const backendFormId = backendForm.formId || backendForm.id;
+        
+        // Map backend field structure to frontend expected structure
+        const mappedFields = backendForm.fields ? backendForm.fields.map(field => ({
+          id: field.id,
+          name: field.fieldName || field.name,
+          type: field.fieldType || field.type,
+          required: field.required !== undefined ? field.required : false,
+          placeholder: field.defaultValue || field.placeholder || '',
+          dropdownOptions: field.dropdownOptions || field.options || [],
+          label: field.fieldLabel || field.label || field.name,
+          order: field.fieldOrder || field.order || 1,
+          active: field.active !== undefined ? field.active : true
+        })) : formData.fields;
+        
+        updatedFormData = {
+          id: backendFormId || finalFormId,
+          formId: backendFormId || finalFormId,
+          name: backendForm.name || formData.name,
+          companyId: backendForm.companyId || companyId,
+          categoryId: backendForm.assignedCategoryId || backendForm.categoryId || formData.categoryId,
+          subCategoryId: backendForm.assignedSubCategoryId || backendForm.subCategoryId || formData.subCategoryId,
+          enabled: backendForm.enabled !== undefined ? backendForm.enabled : formData.enabled !== undefined ? formData.enabled : true,
+          fields: mappedFields,
+          createdAt: backendForm.createdAt,
+          updatedAt: backendForm.updatedAt || new Date().toISOString()
+        };
+      }
+      
+      return updatedFormData;
     } catch (error) {
       console.error('Redux: Error updating custom form:', error);
       console.error('Error response:', error.response?.data);
@@ -525,22 +714,9 @@ export const assignFormToSubCategory = createAsyncThunk(
   'customForms/assignSubCategory',
   async ({ formId, subCategoryId }, { rejectWithValue }) => {
     try {
-      console.log('=== assignFormToSubCategory called ===');
-      console.log('Received formId:', formId);
-      console.log('Received subCategoryId:', subCategoryId);
-      console.log('formId analysis:', {
-        value: formId,
-        type: typeof formId,
-        isFormId: formId?.startsWith?.('FORM-'),
-        isMongoId: /^\d+$/.test(formId),
-        length: formId?.length
-      });
-      console.log('API endpoint being called:', `${API_BASE}/${formId}/assign-subcategory`);
-      
       const token = getItemFromSessionStorage('token', null);
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.put(`${API_BASE}/${formId}/assign-subcategory`, { subCategoryId }, { headers });
-      console.log('Assign form to sub-category response:', response.data);
       return { id: formId, formId: formId, subCategoryId };
     } catch (error) {
       console.error('Redux: Error assigning form to sub-category:', error);

@@ -991,7 +991,6 @@ const AssetDetailPage = () => {
             statusLabelId: asset.statusLabelId || '',
             purchaseDate: asset.purchaseDate ? new Date(asset.purchaseDate).toISOString().slice(0, 10) : '',
             purchaseCost: asset.purchaseCost ?? '',
-            gstRate: asset.gstRate ?? '',
             invoiceNumber: asset.invoiceNumber || '',
         });
         setEditingOverview(true);
@@ -1007,7 +1006,7 @@ const AssetDetailPage = () => {
             if (overviewDraft.statusLabelId !== (asset.statusLabelId || '')) payload.statusLabelId = overviewDraft.statusLabelId || null;
             if (overviewDraft.purchaseDate !== (asset.purchaseDate ? new Date(asset.purchaseDate).toISOString().slice(0, 10) : '')) payload.purchaseDate = overviewDraft.purchaseDate || null;
             if (String(overviewDraft.purchaseCost) !== String(asset.purchaseCost ?? '')) payload.purchaseCost = overviewDraft.purchaseCost === '' ? null : Number(overviewDraft.purchaseCost);
-            if (String(overviewDraft.gstRate) !== String(asset.gstRate ?? '')) payload.gstRate = overviewDraft.gstRate === '' ? null : Number(overviewDraft.gstRate);
+
             if (overviewDraft.invoiceNumber !== (asset.invoiceNumber || '')) payload.invoiceNumber = overviewDraft.invoiceNumber || null;
 
             if (Object.keys(payload).length === 0) {
@@ -1591,20 +1590,7 @@ const AssetDetailPage = () => {
                                                 <span className="font-medium">₹{asset.purchaseCost?.toLocaleString()}</span>
                                                 )}
                                             </div>
-                                            <div className="flex justify-between items-center gap-4">
-                                                <span className="text-gray-600">GST Rate:</span>
-                                                {editingOverview ? (
-                                                    <input
-                                                        type="number"
-                                                        className="p-2 border rounded-md min-w-[200px]"
-                                                        value={overviewDraft.gstRate}
-                                                        onChange={(e) => setOverviewDraft(v => ({ ...v, gstRate: e.target.value }))}
-                                                        placeholder="0"
-                                                    />
-                                                ) : (
-                                                <span className="font-medium">{asset.gstRate}%</span>
-                                                )}
-                                            </div>
+
                                             <div className="flex justify-between items-center gap-4">
                                                 <span className="text-gray-600">Invoice Number:</span>
                                                 {editingOverview ? (

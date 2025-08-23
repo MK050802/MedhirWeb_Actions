@@ -241,7 +241,7 @@ export const fetchVendorBills = createAsyncThunk(
         return rejectWithValue('Company ID not found in session storage');
       }
       
-      const response = await fetch(`${publicRuntimeConfig.apiURL}/bills/Vendors?companyId=${companyId}&vendorId=${vendorId}`, {
+      const response = await fetch(`${publicRuntimeConfig.apiURL}/bills?companyId=${companyId}&vendorId=${vendorId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -270,7 +270,7 @@ export const fetchVendorPayments = createAsyncThunk(
         return rejectWithValue('Company ID not found in session storage');
       }
       
-      const response = await fetch(`${publicRuntimeConfig.apiURL}/payments/Vendors?companyId=${companyId}&vendorId=${vendorId}`, {
+      const response = await fetch(`${publicRuntimeConfig.apiURL}/payments?companyId=${companyId}&vendorId=${vendorId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -299,7 +299,7 @@ export const fetchVendorPurchaseOrders = createAsyncThunk(
         return rejectWithValue('Company ID not found in session storage');
       }
       
-      const response = await fetch(`${publicRuntimeConfig.apiURL}/purchase-orders/Vendors?companyId=${companyId}&vendorId=${vendorId}`, {
+      const response = await fetch(`${publicRuntimeConfig.apiURL}/purchase-orders?companyId=${companyId}&vendorId=${vendorId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

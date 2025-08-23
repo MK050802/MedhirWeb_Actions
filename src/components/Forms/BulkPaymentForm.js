@@ -52,7 +52,8 @@ const BulkPaymentForm = ({ mode = 'add', initialData = null, onSubmit, onCancel 
     currency: 'INR',
     reference: '',
     tdsApplied: false,
-    notes: ''
+    notes: '',
+    totalAmount: '' // <-- Add totalAmount to form state
   });
 
   // Initialize form data when in edit mode
@@ -64,7 +65,13 @@ const BulkPaymentForm = ({ mode = 'add', initialData = null, onSubmit, onCancel 
         setSelectedVendor(vendor);
         setVendorSearch(vendor.vendorName);
         // Fetch bills for this vendor
-        dispatch(fetchBillsOfVendor(vendor.vendorId));
+        const companyId = sessionStorage.getItem('employeeCompanyId');
+        if (companyId) {
+          dispatch(fetchBillsOfVendor({ vendorId: vendor.vendorId, companyId }));
+        } else {
+          console.error('Company ID not found in session storage');
+          toast.error('Company ID not found. Please refresh the page.');
+        }
         setFormData({
           vendor: vendor.vendorName,
           gstin: vendor.gstin,
@@ -76,7 +83,8 @@ const BulkPaymentForm = ({ mode = 'add', initialData = null, onSubmit, onCancel 
           currency: initialData.currency || 'INR',
           reference: initialData.paymentTransactionId || '',
           tdsApplied: initialData.tdsApplied || false,
-          notes: initialData.notes || ''
+          notes: initialData.notes || '',
+          totalAmount: initialData.totalAmount || '' // <-- Initialize from initialData if present
         });
         
         // Set payment receipt if available
@@ -96,6 +104,7 @@ const BulkPaymentForm = ({ mode = 'add', initialData = null, onSubmit, onCancel 
   const [attachments, setAttachments] = useState([]);
   const [availableCredit, setAvailableCredit] = useState(0);
   const [appliedCredit, setAppliedCredit] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     dispatch(fetchVendors());
@@ -191,7 +200,15 @@ const BulkPaymentForm = ({ mode = 'add', initialData = null, onSubmit, onCancel 
     setShowVendorDropdown(false);
     setErrors(prev => ({ ...prev, vendor: undefined }));
     setSelectedVendor(vendor);
-    dispatch(fetchBillsOfVendor(vendor.vendorId));
+    
+    // Get company ID from session storage
+    const companyId = sessionStorage.getItem('employeeCompanyId');
+    if (companyId) {
+      dispatch(fetchBillsOfVendor({ vendorId: vendor.vendorId, companyId }));
+    } else {
+      console.error('Company ID not found in session storage');
+      toast.error('Company ID not found. Please refresh the page.');
+    }
   };
 
   const handleBillSelection = (billId, checked) => {
@@ -334,21 +351,25 @@ const BulkPaymentForm = ({ mode = 'add', initialData = null, onSubmit, onCancel 
   }, 0);
   
   const totalAmountDueSelected = selectedBills.reduce((sum, bill) => sum + (bill.paymentAmount || 0), 0);
-  const finalPaymentAmount = totalAmountDueSelected - appliedCredit;
+  const finalPaymentAmount = formData.totalAmount !== '' ? parseFloat(formData.totalAmount) || 0 : totalAmountDueSelected - appliedCredit;
 
   const validateForm = () => {
     const newErrors = {};
     if (!formData.vendor) newErrors.vendor = 'Please select a vendor';
-    if (!formData.company) newErrors.company = 'Please select a company';
     if (!formData.paymentDate) newErrors.paymentDate = 'Payment date is required';
     if (!formData.paymentMethod) newErrors.paymentMethod = 'Please select a payment method';
     if (!formData.bankAccount) newErrors.bankAccount = 'Please select a bank account';
-    if (selectedBills.length === 0) newErrors.bills = 'Please select at least one bill to pay';
     
     // Check if at least one bill has a payment amount > 0
     const hasValidPayments = selectedBills.some(bill => (bill.paymentAmount || 0) > 0);
     if (selectedBills.length > 0 && !hasValidPayments) {
       newErrors.bills = 'At least one bill must have a payment amount greater than 0';
+    }
+    
+    // Check if company ID is available
+    const companyId = sessionStorage.getItem('employeeCompanyId');
+    if (!companyId) {
+      newErrors.company = 'Company ID not found. Please refresh the page.';
     }
     
     setErrors(newErrors);
@@ -358,52 +379,52 @@ const BulkPaymentForm = ({ mode = 'add', initialData = null, onSubmit, onCancel 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (validateForm()) {
-      // Format the payment data according to the API structure
-      const paymentData = {
-        vendorId: selectedVendor.vendorId,
-        companyId: selectedVendor.companyId, // Use from selectedVendor or default
-        gstin: selectedVendor.gstin,
-        paymentMethod: formData.paymentMethod,
-        bankAccount: formData.bankAccount,
-        paymentTransactionId: formData.reference,
-        paymentDate: formData.paymentDate,
-        totalAmount: finalPaymentAmount-selectedVendor.totalCredit < 0 ? 0 : finalPaymentAmount-selectedVendor.totalCredit,
-        adjustedAmountFromCredits: finalPaymentAmount-selectedVendor.totalCredit < 0 ? finalPaymentAmount : selectedVendor.totalCredit,
-        tdsApplied: formData.tdsApplied,
-        notes: formData.notes,
-        paymentProofUrl: null, // Will be set by backend after file upload
-        billPayments: selectedBills.map(bill => ({
-          billId: bill.billId,
-          paidAmount: bill.paymentAmount
-        }))
-      };
-
-      console.log('Payment data to be sent:', paymentData);
-
-      // Always use FormData since backend doesn't support JSON
-      const formDataToSend = new FormData();
-      formDataToSend.append('payment', JSON.stringify(paymentData));
-
-      // Add attachments if any
-      attachments.forEach((file, index) => {
-        formDataToSend.append(`attachments`, file);
-      });
-
-      // Add payment receipt if uploaded - updated to use uploadedFile
-      if (uploadedFile) {
-        formDataToSend.append('paymentProof', uploadedFile);
-        console.log('Payment proof added to form data:', uploadedFile.name, uploadedFile.size, uploadedFile.type);
-      } else {
-        console.log('No payment proof uploaded');
-      }
-
-      // Debug: Log FormData contents
-      console.log('FormData contents:');
-      for (let [key, value] of formDataToSend.entries()) {
-        console.log(key, value);
-      }
-
+      setIsSubmitting(true);
+      
       try {
+        // Format the payment data according to the API structure
+        const paymentData = {
+          vendorId: selectedVendor.vendorId,
+          gstin: selectedVendor.gstin,
+          paymentMethod: formData.paymentMethod,
+          bankAccount: formData.bankAccount,
+          paymentTransactionId: formData.reference,
+          paymentDate: formData.paymentDate,
+          totalAmount: finalPaymentAmount, // <-- Use the editable value if provided
+          tdsApplied: formData.tdsApplied,
+          notes: formData.notes,
+          paymentProofUrl: null, // Will be set by backend after file upload
+          billPayments: selectedBills.map(bill => ({
+            billId: bill.billId,
+            paidAmount: bill.paymentAmount
+          }))
+        };
+
+        console.log('Payment data to be sent:', paymentData);
+
+        // Always use FormData since backend doesn't support JSON
+        const formDataToSend = new FormData();
+        formDataToSend.append('payment', JSON.stringify(paymentData));
+
+        // Add attachments if any
+        attachments.forEach((file, index) => {
+          formDataToSend.append(`attachments`, file);
+        });
+
+        // Add payment receipt if uploaded - updated to use uploadedFile
+        if (uploadedFile) {
+          formDataToSend.append('paymentProof', uploadedFile);
+          console.log('Payment proof added to form data:', uploadedFile.name, uploadedFile.size, uploadedFile.type);
+        } else {
+          console.log('No payment proof uploaded');
+        }
+
+        // Debug: Log FormData contents
+        console.log('FormData contents:');
+        for (let [key, value] of formDataToSend.entries()) {
+          console.log(key, value);
+        }
+
         let result;
         if (mode === 'edit' && initialData) {
           // Update existing payment
@@ -429,6 +450,8 @@ const BulkPaymentForm = ({ mode = 'add', initialData = null, onSubmit, onCancel 
       } catch (error) {
         console.error('Payment submission error:', error);
         toast.error(mode === 'edit' ? 'Payment update failed. Please try again.' : 'Payment submission failed. Please try again.');
+      } finally {
+        setIsSubmitting(false);
       }
     } else {
       console.log(errors);
@@ -474,6 +497,18 @@ const BulkPaymentForm = ({ mode = 'add', initialData = null, onSubmit, onCancel 
           <div className="lg:col-span-1 overflow-hidden pb-8 min-w-0">
             {/* Form Content */}
             <div className="space-y-3 pb-4 overflow-y-auto h-full">
+              {/* Company ID Error Display */}
+              {errors.company && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                  <div className="flex items-center">
+                    <svg className="h-5 w-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <span className="text-sm text-red-700">{errors.company}</span>
+                  </div>
+                </div>
+              )}
+              
               {/* Top Section - Payment Details */}
               <div className="flex flex-col lg:flex-row gap-3">
                 {/* Payment Details */}
@@ -611,6 +646,20 @@ const BulkPaymentForm = ({ mode = 'add', initialData = null, onSubmit, onCancel 
                       onChange={handleChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       placeholder="e.g., June 2025 settlement"
+                    />
+                  </div>
+                  {/* Total Amount (Editable) */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Total Amount</label>
+                    <input
+                      type="number"
+                      name="totalAmount"
+                      value={formData.totalAmount}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="Enter total amount or leave blank for auto-calc"
+                      min="0"
+                      step="0.01"
                     />
                   </div>
                 </div>
@@ -788,10 +837,25 @@ const BulkPaymentForm = ({ mode = 'add', initialData = null, onSubmit, onCancel 
             </button>
             <button
               type="button"
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors"
+              className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                isSubmitting 
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
               onClick={handleSubmit}
+              disabled={isSubmitting}
             >
-              {mode === 'edit' ? 'Update Payment' : 'Confirm Payment'}
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  {mode === 'edit' ? 'Updating...' : 'Processing...'}
+                </span>
+              ) : (
+                mode === 'edit' ? 'Update Payment' : 'Confirm Payment'
+              )}
             </button>
           </div>
         </div>

@@ -419,27 +419,46 @@ const BillForm = ({ bill, onCancel }) => {
   };
 
   // Calculate totals
-  const subtotal = billLines.reduce((sum, l) => sum + l.qty * l.rate, 0);
-  const totalGST = billLines.reduce(
-    (sum, l) => sum + l.qty * l.rate * (l.gst / 100),
-    0
-  );
-  const totalCGST = billLines.reduce(
-    (sum, l) => sum + l.qty * l.rate * (l.cgst / 100),
-    0
-  );
-  const totalSGST = billLines.reduce(
-    (sum, l) => sum + l.qty * l.rate * (l.sgst / 100),
-    0
-  );
-  const totalIGST = billLines.reduce(
-    (sum, l) => sum + l.qty * l.rate * (l.igst / 100),
-    0
-  );
+  const subtotal = billLines && billLines.length > 0 ? billLines.reduce((sum, l) => {
+    const qty = Number(l.qty) || 0;
+    const rate = Number(l.rate) || 0;
+    return sum + (qty * rate);
+  }, 0) : 0;
+  
+  const totalGST = billLines && billLines.length > 0 ? billLines.reduce((sum, l) => {
+    const qty = Number(l.qty) || 0;
+    const rate = Number(l.rate) || 0;
+    const gst = Number(l.gst) || 0;
+    return sum + (qty * rate * (gst / 100));
+  }, 0) : 0;
+  
+  const totalCGST = billLines && billLines.length > 0 ? billLines.reduce((sum, l) => {
+    const qty = Number(l.qty) || 0;
+    const rate = Number(l.rate) || 0;
+    const cgst = Number(l.cgst) || 0;
+    return sum + (qty * rate * (cgst / 100));
+  }, 0) : 0;
+  
+  const totalSGST = billLines && billLines.length > 0 ? billLines.reduce((sum, l) => {
+    const qty = Number(l.qty) || 0;
+    const rate = Number(l.rate) || 0;
+    const sgst = Number(l.sgst) || 0;
+    return sum + (qty * rate * (sgst / 100));
+  }, 0) : 0;
+  
+  const totalIGST = billLines && billLines.length > 0 ? billLines.reduce((sum, l) => {
+    const qty = Number(l.qty) || 0;
+    const rate = Number(l.rate) || 0;
+    const igst = Number(l.igst) || 0;
+    return sum + (qty * rate * (igst / 100));
+  }, 0) : 0;
+  
   const total =
-    placeOfSupply === "interstate"
-      ? subtotal + totalCGST + totalSGST
-      : subtotal + totalIGST;
+    (placeOfSupply === "interstate")
+      ? (subtotal || 0) + (totalCGST || 0) + (totalSGST || 0)
+      : (subtotal || 0) + (totalIGST || 0);
+
+
 
   // Validation helpers
   const validate = () => {
@@ -499,7 +518,12 @@ const BillForm = ({ bill, onCancel }) => {
           line.sgst = 0;
         }
       } else {
-        line[field] = value;
+        // Ensure numeric fields are properly converted to numbers
+        if (field === "qty" || field === "rate" || field === "cgst" || field === "sgst" || field === "igst") {
+          line[field] = Number(value) || 0;
+        } else {
+          line[field] = value;
+        }
       }
       updatedLines[idx] = line;
       return updatedLines;
@@ -646,6 +670,11 @@ const BillForm = ({ bill, onCancel }) => {
         ).unwrap();
         if (result) {
           console.log("Bill updated successfully:", result);
+          
+          // Show success message with bill details
+          toast.success(`Bill updated successfully!`, {
+            description: `Bill Number: ${result.billNumber || billData.billNumber} | Amount: ₹${result.finalAmount || billData.finalAmount} | Vendor: ${selectedVendor?.vendorName || 'N/A'}`
+          });
           onCancel();
         }
       } else {
@@ -660,6 +689,11 @@ const BillForm = ({ bill, onCancel }) => {
         const result = await dispatch(addBill(formData)).unwrap();
         if (result) {
           console.log("Bill created successfully:", result);
+          
+          // Show success message with bill details
+          toast.success(`Bill created successfully!`, {
+            description: `Bill Number: ${result.billNumber || billData.billNumber} | Amount: ₹${result.finalAmount || billData.finalAmount} | Vendor: ${selectedVendor?.vendorName || 'N/A'}`
+          });
           onCancel();
         }
       }
@@ -1077,7 +1111,7 @@ const BillForm = ({ bill, onCancel }) => {
                                 <div className="flex items-center justify-end gap-2">
                                   <span className="min-w-0 flex-1 text-right">
                                     ₹
-                                    {total.toLocaleString("en-IN", {
+                                    {isNaN(total) ? '0.00' : total.toLocaleString("en-IN", {
                                       minimumFractionDigits: 2,
                                     })}
                                   </span>
@@ -1119,7 +1153,7 @@ const BillForm = ({ bill, onCancel }) => {
                       </span>
                       <span className="text-gray-900 font-medium">
                         ₹
-                        {subtotal.toLocaleString("en-IN", {
+                        {isNaN(subtotal) ? '0.00' : subtotal.toLocaleString("en-IN", {
                           minimumFractionDigits: 2,
                         })}
                       </span>
@@ -1134,7 +1168,7 @@ const BillForm = ({ bill, onCancel }) => {
                             <input
                               type="number"
                               className="w-24 text-right bg-white border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              value={totalCGST.toFixed(2)}
+                              value={isNaN(totalCGST) ? '0.00' : totalCGST.toFixed(2)}
                               onChange={(e) => {
                                 const newCGST = parseFloat(e.target.value) || 0;
                                 // Update all line items to reflect the new CGST total
@@ -1166,7 +1200,7 @@ const BillForm = ({ bill, onCancel }) => {
                             <input
                               type="number"
                               className="w-24 text-right bg-white border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              value={totalSGST.toFixed(2)}
+                              value={isNaN(totalSGST) ? '0.00' : totalSGST.toFixed(2)}
                               onChange={(e) => {
                                 const newSGST = parseFloat(e.target.value) || 0;
                                 // Update all line items to reflect the new SGST total
@@ -1199,7 +1233,7 @@ const BillForm = ({ bill, onCancel }) => {
                           <input
                             type="number"
                             className="w-24 text-right bg-white border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            value={totalIGST.toFixed(2)}
+                                                          value={isNaN(totalIGST) ? '0.00' : totalIGST.toFixed(2)}
                             onChange={(e) => {
                               const newIGST = parseFloat(e.target.value) || 0;
                               // Update all line items to reflect the new IGST total
@@ -1230,14 +1264,14 @@ const BillForm = ({ bill, onCancel }) => {
                       <span className="font-bold text-lg">Final Amount:</span>
                       <span className="font-bold text-lg">
                         ₹
-                        {total.toLocaleString("en-IN", {
+                        {isNaN(total) ? '0.00' : total.toLocaleString("en-IN", {
                           minimumFractionDigits: 2,
                         })}
                       </span>
                     </div>
                     <div className="mt-2">
                       <div className="text-sm text-gray-700">
-                        Amount in Words: <span className="italic">{toWords.convert(total)}</span>
+                        Amount in Words: <span className="italic">{isNaN(total) ? 'Zero' : toWords.convert(total)}</span>
                       </div>
                     </div>
                   </div>
@@ -1361,7 +1395,7 @@ const BillForm = ({ bill, onCancel }) => {
           <div className="text-lg font-bold">
             Total Bill Amount:{" "}
             <span className="text-blue-600">
-              ₹{total.toLocaleString("en-IN")}
+              ₹{isNaN(total) ? '0' : total.toLocaleString("en-IN")}
             </span>
           </div>
           <div className="flex gap-3">

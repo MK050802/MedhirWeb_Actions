@@ -13,6 +13,12 @@
  * - Validation ensures subcategory belongs to selected category
  * - Enhanced logging for debugging subcategory assignments
  * - Success messages indicate subcategory assignment status
+ * 
+ * FORM FIELD STRUCTURE UPDATES:
+ * - Dropdown fields now include options array of strings
+ * - Backward compatibility with legacy 'options' field format
+ * - Proper validation for dropdown options
+ * - Enhanced field mapping from API responses
  */
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import AssetManagementLayout from '@/components/AssetManagementLayout';
@@ -509,7 +515,7 @@ const CategorySettings = ({
                                                                      const prefixBase = (subCat.prefix && String(subCat.prefix).trim())
                                                                          ? String(subCat.prefix).trim()
                                                                          : `${getFirstThreeLetters(cat.name)}-${getFirstThreeLetters(subCat.name)}`;
-                                                                     const prefix = `${prefixBase}-`;
+                                                                     const prefix = prefixBase;
                                                                      const suffix = subCat.suffix || '0001';
                                                                      return (
                                                                         <div className="flex items-center gap-1">
@@ -1053,8 +1059,30 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
     useEffect(() => {
         console.log('Fields state changed:', {
             fieldsCount: fields.length,
-            fields: fields.map(f => ({ id: f.id, name: f.name, type: f.type }))
+            fields: fields.map(f => ({ 
+                id: f.id, 
+                name: f.name, 
+                type: f.type,
+                hasOptions: !!f.options,
+                optionsCount: f.options?.length || 0,
+                options: f.options
+            }))
         });
+        
+        // Log dropdown fields specifically
+        const dropdownFields = fields.filter(f => f.type === 'dropdown');
+        if (dropdownFields.length > 0) {
+            console.log('Dropdown fields in current state:', dropdownFields);
+            dropdownFields.forEach((field, index) => {
+                console.log(`Dropdown field ${index + 1} (${field.name}):`, {
+                    id: field.id,
+                    type: field.type,
+                    options: field.options,
+                    optionsCount: field.options?.length || 0,
+                    optionValues: field.options?.map(opt => opt.value) || []
+                });
+            });
+        }
     }, [fields]);
 
     // Monitor subcategory state changes for debugging
@@ -1075,6 +1103,21 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
+    // Helper function to check if form can be saved
+    const canSaveForm = () => {
+        if (!formName.trim() || !selectedCategory || fields.length === 0) {
+            return false;
+        }
+        
+        // Check if any dropdown fields have invalid options
+        const hasInvalidDropdownFields = fields.some(f => 
+            f.type === 'dropdown' && (!f.options || f.options.length === 0 || 
+            f.options.some(opt => !opt.value || !opt.value.trim()))
+        );
+        
+        return !hasInvalidDropdownFields;
+    };
+
     // Simple effect to ensure subcategory is set when editing starts
     useEffect(() => {
         if (view === 'edit' && editingFormId && forms && Array.isArray(forms) && forms.length > 0) {
@@ -1090,6 +1133,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
     }, [view, editingFormId, forms, selectedSubCategory]);
 
     const handleNewForm = () => {
+        console.log('handleNewForm called, clearing form state');
         setView('create');
         setFormName('');
         setSelectedCategory('');
@@ -1104,6 +1148,96 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
             fields: []
         });
         dispatch(clearCurrentForm());
+        console.log('Form state cleared, fields should be empty array');
+    };
+
+    const handleCloneForm = (formToClone) => {
+        console.log('handleCloneForm called with form:', formToClone);
+        
+        // Set view to create mode
+        setView('create');
+        setEditingFormId(null);
+        
+        // Clone the form name with "(Copy)" suffix
+        const originalName = formToClone.name || 'Untitled Form';
+        const clonedName = `${originalName} (Copy)`;
+        setFormName(clonedName);
+        
+        // Clone the category and subcategory
+        const clonedCategoryId = formToClone.assignedCategoryId || formToClone.categoryId || '';
+        const clonedSubCategoryId = formToClone.assignedSubCategoryId || formToClone.subCategoryId || formToClone.subCategory?.id || '';
+        
+        setSelectedCategory(clonedCategoryId);
+        setSelectedSubCategory(clonedSubCategoryId);
+        
+        // Clone all fields with new IDs to avoid conflicts
+        if (formToClone.fields && Array.isArray(formToClone.fields)) {
+            const clonedFields = formToClone.fields.map((field, index) => ({
+                id: `field_${Date.now()}_${index}_${Math.random()}`, // Generate new unique ID
+                name: field.fieldLabel || field.fieldName || field.name || '',
+                type: field.fieldType || field.type || 'text',
+                required: Boolean(field.required),
+                placeholder: field.defaultValue || field.placeholder || '',
+                options: []
+            }));
+
+            // Handle dropdown options for cloned fields
+            clonedFields.forEach((field, index) => {
+                if (field.type === 'dropdown') {
+                    const originalField = formToClone.fields[index];
+                    
+                    // Check for options in different possible formats
+                    if (originalField.options && Array.isArray(originalField.options)) {
+                        if (originalField.options.length > 0 && typeof originalField.options[0] === 'string') {
+                            // New format: options array of strings
+                            field.options = originalField.options.map((opt, optIndex) => ({
+                                id: `option_${Date.now()}_${optIndex}_${Math.random()}`,
+                                value: opt
+                            }));
+                        } else {
+                            // Legacy format: options array of objects
+                            field.options = originalField.options.map((opt, optIndex) => ({
+                                id: `option_${Date.now()}_${optIndex}_${Math.random()}`,
+                                value: typeof opt === 'string' ? opt : opt.value || opt.label || ''
+                            }));
+                        }
+                    } else if (originalField.dropdownOptions && Array.isArray(originalField.dropdownOptions)) {
+                        // Fallback: check for dropdownOptions
+                        field.options = originalField.dropdownOptions.map((opt, optIndex) => ({
+                            id: `option_${Date.now()}_${optIndex}_${Math.random()}`,
+                            value: typeof opt === 'string' ? opt : opt.value || opt.label || ''
+                        }));
+                    }
+                }
+            });
+            
+            setFields(clonedFields);
+            console.log('Cloned fields:', clonedFields);
+        } else {
+            setFields([]);
+        }
+        
+        // Clear any errors
+        setFormError('');
+        setFieldErrors({
+            formName: '',
+            category: '',
+            subCategory: '',
+            fields: []
+        });
+        
+        // Clear current form from Redux
+        dispatch(clearCurrentForm());
+        
+        // Show success message
+        toast.success(`Form "${originalName}" cloned successfully! You can now modify the fields and save as a new form.`);
+        
+        console.log('Form cloned successfully:', {
+            name: clonedName,
+            categoryId: clonedCategoryId,
+            subCategoryId: clonedSubCategoryId,
+            fieldsCount: formToClone.fields?.length || 0
+        });
     };
     
     const handleFormNameChange = (value) => {
@@ -1152,9 +1286,25 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                 options: []
             };
 
-            // Handle dropdown options
+            // Handle dropdown options - check both 'options' and 'dropdownOptions' fields for backward compatibility
             if (apiField.options && Array.isArray(apiField.options)) {
-                mappedField.options = apiField.options.map((opt, optIndex) => ({
+                // Check if it's an array of strings (new format) or objects (legacy format)
+                if (apiField.options.length > 0 && typeof apiField.options[0] === 'string') {
+                    // New format: options array of strings
+                    mappedField.options = apiField.options.map((opt, optIndex) => ({
+                        id: `option_${Date.now()}_${optIndex}_${Math.random()}`,
+                        value: opt
+                    }));
+                } else {
+                    // Legacy format: options array of objects
+                    mappedField.options = apiField.options.map((opt, optIndex) => ({
+                        id: `option_${Date.now()}_${optIndex}_${Math.random()}`,
+                        value: typeof opt === 'string' ? opt : opt.value || opt.label || ''
+                    }));
+                }
+            } else if (apiField.dropdownOptions && Array.isArray(apiField.dropdownOptions)) {
+                // Fallback: check for dropdownOptions (for backward compatibility)
+                mappedField.options = apiField.dropdownOptions.map((opt, optIndex) => ({
                     id: `option_${Date.now()}_${optIndex}_${Math.random()}`,
                     value: typeof opt === 'string' ? opt : opt.value || opt.label || ''
                 }));
@@ -1199,6 +1349,21 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
             assignedSubCategoryId: form?.assignedSubCategoryId,
             subCategory: form?.subCategory
         });
+        
+        // CRITICAL: Log the fields structure to see what format the API is returning
+        console.log('=== FORM FIELDS STRUCTURE ===');
+        if (form.fields && Array.isArray(form.fields)) {
+            form.fields.forEach((field, index) => {
+                console.log(`Field ${index + 1} (${field.name || 'unnamed'}):`, {
+                    type: field.type,
+                    hasOptions: !!field.options,
+                    optionsCount: field.options?.length || 0,
+                    options: field.options
+                });
+            });
+        } else {
+            console.log('No fields found in form data');
+        }
         console.log('=== END RAW FORM DATA ===');
         
         if (form) {
@@ -1225,13 +1390,26 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
             // Map API fields to frontend format and ensure proper state update
             const mappedFields = mapApiFieldsToFrontend(form.fields || []);
             
+            // CRITICAL FIX: Ensure fields have the correct structure for editing
+            const cleanedMappedFields = mappedFields.map(field => {
+                if (field.type === 'dropdown') {
+                    // Ensure dropdown fields have valid options structure
+                    if (!field.options || field.options.length === 0) {
+                        // If no options exist, create a default one
+                        field.options = [{ id: Date.now(), value: 'Default Option' }];
+                        console.log('Added default option to dropdown field:', field.name);
+                    }
+                }
+                return field;
+            });
+            
             // Clear any existing fields first, then set new ones
             setFields([]);
             
             // Use setTimeout to ensure state is cleared before setting new fields
             setTimeout(() => {
-                setFields(mappedFields);
-                console.log('Fields set after edit:', mappedFields);
+                setFields(cleanedMappedFields);
+                console.log('Fields set after edit:', cleanedMappedFields);
             }, 0);
             
             setFormError('');
@@ -1335,6 +1513,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
 
     const addField = () => {
         console.log('addField called. Current fields count:', fields.length);
+        console.log('Current fields state:', fields);
         
         // Check if we've reached the maximum limit of 15 fields
         if (fields.length >= 15) {
@@ -1356,21 +1535,59 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
         
         // Use functional update to ensure we're working with the latest state
         setFields(prevFields => {
+            console.log('setFields callback - prevFields:', prevFields);
             const updatedFields = [...prevFields, newField];
             console.log('Added new field. Previous count:', prevFields.length, 'New count:', updatedFields.length);
+            console.log('Updated fields array:', updatedFields);
             return updatedFields;
         });
     };
 
     const removeField = (fieldId) => {
         console.log('Removing field with ID:', fieldId);
+        console.log('Current fields before removal:', fields);
         const updatedFields = fields.filter(field => field.id !== fieldId);
         console.log('Updated fields after removal:', updatedFields);
         setFields(updatedFields);
     };
 
     const updateField = (fieldId, key, value) => {
-        console.log('Updating field:', { fieldId, key, value });
+        console.log('Updating field:', { fieldId, key, value, currentFields: fields });
+        
+        // Special handling for field type changes
+        if (key === 'type' && value === 'dropdown') {
+            // When changing to dropdown type, automatically add a default option if none exist
+            const currentField = fields.find(f => f.id === fieldId);
+            console.log('Field type change to dropdown, current field:', currentField);
+            if (currentField && (!currentField.options || currentField.options.length === 0)) {
+                console.log('Field changed to dropdown type, adding default option');
+                const updatedFields = fields.map(field => 
+                    field.id === fieldId 
+                        ? { 
+                            ...field, 
+                            [key]: value,
+                            options: [{ id: Date.now(), value: 'Option 1' }]
+                        } 
+                        : field
+                );
+                console.log('Updated fields with default option:', updatedFields);
+                setFields(updatedFields);
+                toast.info("Dropdown field created! Added a default option. You can edit or add more options.");
+                return;
+            } else if (currentField && currentField.options && currentField.options.length > 0) {
+                // Field already has options, just change the type
+                console.log('Field changed to dropdown type, keeping existing options:', currentField.options);
+                // Still update the field type
+                const updatedFields = fields.map(field => 
+                    field.id === fieldId 
+                        ? { ...field, [key]: value }
+                        : field
+                );
+                setFields(updatedFields);
+                return;
+            }
+        }
+        
         const updatedFields = fields.map(field => 
             field.id === fieldId ? { ...field, [key]: value } : field
         );
@@ -1382,17 +1599,19 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
     };
 
     const addDropdownOption = (fieldId) => {
+        console.log('Adding dropdown option for field:', { fieldId, currentFields: fields });
         setFields(fields.map(field => 
             field.id === fieldId 
                 ? { 
                     ...field, 
-                    options: [...field.options, { id: Date.now(), value: '' }] 
+                    options: [...(field.options || []), { id: Date.now(), value: '' }] 
                 } 
                 : field
         ));
     };
 
     const removeDropdownOption = (fieldId, optionId) => {
+        console.log('Removing dropdown option:', { fieldId, optionId, currentFields: fields });
         setFields(fields.map(field => 
             field.id === fieldId 
                 ? { 
@@ -1404,6 +1623,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
     };
 
     const updateDropdownOption = (fieldId, optionId, value) => {
+        console.log('Updating dropdown option:', { fieldId, optionId, value, currentFields: fields });
         setFields(fields.map(field => 
             field.id === fieldId 
                 ? { 
@@ -1459,23 +1679,26 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                 hasErrors = true;
                 break;
             }
-            if (field.type === 'dropdown' && field.options.length === 0) {
-                setFormError('Dropdown field must have at least one option');
-                hasErrors = true;
-                break;
-            }
             
-            // Additional validation for dropdown options
-            if (field.type === 'dropdown' && field.options.length > 0) {
+            // Enhanced dropdown validation
+            if (field.type === 'dropdown') {
+                // Check if options exist and have values
+                if (!field.options || !Array.isArray(field.options) || field.options.length === 0) {
+                    setFormError(`Dropdown field "${field.name}" must have at least one option`);
+                    hasErrors = true;
+                    break;
+                }
+                
+                // Check for empty option values
                 const invalidOptions = field.options.filter(opt => !opt.value || !opt.value.trim());
                 if (invalidOptions.length > 0) {
-                    setFormError(`Dropdown field "${field.name}" has empty options`);
+                    setFormError(`Dropdown field "${field.name}" has empty options. Please fill in all option values.`);
                     hasErrors = true;
                     break;
                 }
                 
                 // Check for duplicate option values
-                const optionValues = field.options.map(opt => opt.value.trim());
+                const optionValues = field.options.map(opt => opt.value.trim()).filter(Boolean);
                 const uniqueOptionValues = new Set(optionValues);
                 if (optionValues.length !== uniqueOptionValues.size) {
                     setFormError(`Dropdown field "${field.name}" has duplicate option values`);
@@ -1537,26 +1760,112 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                 return;
             }
 
+            // Debug: Log the current fields state before creating form data
+            console.log('=== FIELDS STATE BEFORE FORM DATA CREATION ===');
+            console.log('Fields state type:', typeof fields);
+            console.log('Fields is array:', Array.isArray(fields));
+            console.log('Fields length:', fields?.length || 0);
+            console.log('Fields:', fields);
+            
+            fields.forEach((field, index) => {
+                console.log(`Field ${index + 1}:`, {
+                    id: field.id,
+                    name: field.name,
+                    type: field.type,
+                    options: field.options,
+                    optionsCount: field.options?.length || 0,
+                    optionValues: field.options?.map(opt => opt.value) || []
+                });
+            });
+            
+            // CRITICAL: Validate that dropdown fields have options before creating form data
+            const dropdownFieldsWithoutOptions = fields.filter(field => 
+                field.type === 'dropdown' && (!field.options || field.options.length === 0)
+            );
+            
+            if (dropdownFieldsWithoutOptions.length > 0) {
+                const fieldNames = dropdownFieldsWithoutOptions.map(f => f.name || 'unnamed');
+                setFormError(`Dropdown fields must have at least one option: ${fieldNames.join(', ')}. Please add options before saving.`);
+                setFormLoading(false);
+                return;
+            }
+            
+            // CRITICAL: Validate that dropdown options have actual values
+            const dropdownFieldsWithEmptyValues = fields.filter(field => 
+                field.type === 'dropdown' && 
+                field.options && 
+                field.options.length > 0 &&
+                field.options.every(opt => !opt.value || !opt.value.trim())
+            );
+            
+            if (dropdownFieldsWithEmptyValues.length > 0) {
+                const fieldNames = dropdownFieldsWithEmptyValues.map(f => f.name || 'unnamed');
+                setFormError(`Dropdown fields have empty option values: ${fieldNames.join(', ')}. Please fill in all option values before saving.`);
+                setFormLoading(false);
+                return;
+            }
+            
+
+            
+            // Create form data with proper field structure
+            // Backend expects 'dropdownOptions' array for dropdown fields
             const formData = {
                 name: formName.trim(),
                 companyId: companyId,
                 categoryId: selectedCategory.trim(),
                 enabled: true,
-                fields: fields.map(field => ({
-                    name: field.name.trim(),
-                    type: field.type,
-                    required: field.required || false,
-                    placeholder: field.placeholder || '',
-                    ...(field.type === 'dropdown' && { 
-                        options: field.options.map(opt => ({
-                            value: opt.value.trim(),
-                            label: opt.value.trim()
-                        })).filter(opt => opt.value)
-                    })
-                })).filter(field => field.name && field.name.trim()),
+                fields: fields.map(field => {
+                    if (field.type === 'dropdown') {
+                        // Ensure we have valid options with values
+                        const optionValues = field.options
+                            .filter(opt => opt && opt.value && opt.value.trim())
+                            .map(opt => opt.value.trim());
+                        
+                        console.log(`Creating dropdown field ${field.name}:`, {
+                            originalOptions: field.options,
+                            mappedValues: optionValues,
+                            finalCount: optionValues.length,
+                            hasValidOptions: optionValues.length > 0
+                        });
+                        
+                        // Validate that we have at least one valid option
+                        if (optionValues.length === 0) {
+                            throw new Error(`Dropdown field "${field.name}" has no valid options`);
+                        }
+                        
+                        return {
+                            name: field.name.trim(),
+                            type: field.type,
+                            required: field.required || false,
+                            placeholder: field.placeholder || '',
+                            dropdownOptions: optionValues  // Backend expects 'dropdownOptions' array
+                        };
+                    }
+                    return {
+                        name: field.name.trim(),
+                        type: field.type,
+                        required: field.required || false,
+                        placeholder: field.placeholder || ''
+                    };
+                }).filter(field => field.name && field.name.trim()),
                 // Always include subCategoryId if selected, even if empty string
                 subCategoryId: selectedSubCategory || null
             };
+            
+
+            
+            // CRITICAL: Final validation - ensure dropdownOptions are actually present
+            const dropdownFieldsInFormData = formData.fields.filter(f => f.type === 'dropdown');
+            const invalidDropdownFields = dropdownFieldsInFormData.filter(f => !f.dropdownOptions || f.dropdownOptions.length === 0);
+            
+            if (invalidDropdownFields.length > 0) {
+                const fieldNames = invalidDropdownFields.map(f => f.name || 'unnamed');
+                setFormError(`Critical error: Dropdown fields missing dropdownOptions in form data: ${fieldNames.join(', ')}. This should not happen.`);
+                setFormLoading(false);
+                return;
+            }
+            
+            // formData already has the correct structure with dropdownOptions, so we can use it directly
 
             // Final validation of the form data
             if (!formData.name || !formData.categoryId || !formData.fields || formData.fields.length === 0) {
@@ -1569,20 +1878,72 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
             const invalidFields = formData.fields.filter(field => {
                 if (!field.name || !field.type) return true;
                 if (!validFieldTypes.includes(field.type)) return true;
-                if (field.type === 'dropdown' && (!field.options || field.options.length === 0)) return true;
+                if (field.type === 'dropdown' && (!field.dropdownOptions || field.dropdownOptions.length === 0)) return true;
                 return false;
             });
 
             if (invalidFields.length > 0) {
-                setFormError(`Invalid field structure: ${invalidFields.map(f => f.name || 'unnamed').join(', ')}`);
+                const invalidFieldNames = invalidFields.map(f => f.name || 'unnamed');
+                setFormError(`Invalid field structure: ${invalidFieldNames.join(', ')}. Dropdown fields must have at least one option.`);
                 return;
             }
             
+            // Additional validation: Check if any dropdown fields have empty options
+            const dropdownFieldsWithEmptyOptions = formData.fields.filter(field => 
+                field.type === 'dropdown' && 
+                field.dropdownOptions && 
+                field.dropdownOptions.some(option => !option || option.trim() === '')
+            );
+            
+            if (dropdownFieldsWithEmptyOptions.length > 0) {
+                const fieldNames = dropdownFieldsWithEmptyOptions.map(f => f.name || 'unnamed');
+                setFormError(`Dropdown fields with empty options: ${fieldNames.join(', ')}. Please fill in all option values.`);
+                return;
+            }
+            
+            // Final validation: Ensure all dropdown fields have valid options
+            const dropdownFields = formData.fields.filter(f => f.type === 'dropdown');
+            console.log('Final validation - dropdown fields found:', dropdownFields.length);
+            for (const field of dropdownFields) {
+                console.log(`Validating dropdown field: ${field.name}`, {
+                    hasOptions: !!field.dropdownOptions,
+                    optionsCount: field.dropdownOptions?.length || 0,
+                    options: field.dropdownOptions
+                });
+                
+                if (!field.dropdownOptions || field.dropdownOptions.length === 0) {
+                    setFormError(`Dropdown field "${field.name}" has no options. Please add at least one option.`);
+                    return;
+                }
+                
+                // Check for empty option values
+                const emptyOptions = field.dropdownOptions.filter(opt => !opt || !opt.trim());
+                if (emptyOptions.length > 0) {
+                    setFormError(`Dropdown field "${field.name}" has empty option values. Please fill in all option values.`);
+                    return;
+                }
+            }
+            
             // Debug logging to understand what's being sent
+            console.log('=== FINAL FORM DATA DEBUG ===');
+            console.log('Original fields state:', fields);
             console.log('Form data being sent to API:', JSON.stringify(formData, null, 2));
             console.log('Fields structure:', JSON.stringify(fields, null, 2));
             console.log('Selected category:', selectedCategory);
             console.log('Selected sub-category:', selectedSubCategory);
+            
+            // Log each dropdown field specifically
+            const dropdownFieldsInFinalData = formData.fields.filter(f => f.type === 'dropdown');
+            console.log('Dropdown fields in final data:', dropdownFieldsInFinalData);
+            dropdownFieldsInFinalData.forEach((field, index) => {
+                console.log(`Final dropdown field ${index + 1} (${field.name}):`, {
+                    type: field.type,
+                    dropdownOptions: field.dropdownOptions,
+                    dropdownOptionsCount: field.dropdownOptions?.length || 0,
+                    dropdownOptionsType: typeof field.dropdownOptions,
+                    isArray: Array.isArray(field.dropdownOptions)
+                });
+            });
             
             // Log the exact structure being sent
             console.log('=== FORM DATA STRUCTURE DEBUG ===');
@@ -1592,6 +1953,77 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
             console.log('formData.fields count:', formData.fields.length);
             console.log('formData.fields:', formData.fields);
             console.log('formData.subCategoryId:', formData.subCategoryId);
+            
+            // Log each field individually to ensure dropdownOptions are present
+            formData.fields.forEach((field, index) => {
+                if (field.type === 'dropdown') {
+                    console.log(`Field ${index + 1} (${field.name}) - Dropdown:`, {
+                        type: field.type,
+                        dropdownOptions: field.dropdownOptions,
+                        dropdownOptionsCount: field.dropdownOptions?.length || 0,
+                        dropdownOptionsType: typeof field.dropdownOptions,
+                        isArray: Array.isArray(field.dropdownOptions)
+                    });
+                } else {
+                    console.log(`Field ${index + 1} (${field.name}) - ${field.type}:`, {
+                        type: field.type,
+                        required: field.required,
+                        placeholder: field.placeholder
+                    });
+                }
+            });
+            
+            // Log dropdown options specifically
+            if (dropdownFields.length > 0) {
+                console.log('=== DROPDOWN FIELDS DEBUG ===');
+                dropdownFields.forEach((field, index) => {
+                    console.log(`Field ${index + 1} (${field.name}):`, {
+                        type: field.type,
+                        options: field.options,
+                        optionsCount: field.options?.length || 0
+                    });
+                });
+            }
+            
+            // Final check: Ensure all dropdown fields have dropdownOptions before sending
+            const finalDropdownFields = formData.fields.filter(f => f.type === 'dropdown');
+            const fieldsWithoutOptions = finalDropdownFields.filter(f => !f.dropdownOptions || f.dropdownOptions.length === 0);
+            
+            if (fieldsWithoutOptions.length > 0) {
+                const fieldNames = fieldsWithoutOptions.map(f => f.name || 'unnamed');
+                setFormError(`Critical error: Dropdown fields without dropdownOptions detected: ${fieldNames.join(', ')}. This should not happen.`);
+                setFormLoading(false);
+                return;
+            }
+            
+            // Additional check: Ensure dropdownOptions are in the correct format (array of strings)
+            const fieldsWithInvalidOptions = finalDropdownFields.filter(f => {
+                if (!Array.isArray(f.dropdownOptions)) return true;
+                if (f.dropdownOptions.some(opt => typeof opt !== 'string')) return true;
+                return false;
+            });
+            
+            if (fieldsWithInvalidOptions.length > 0) {
+                const fieldNames = fieldsWithInvalidOptions.map(f => f.name || 'unnamed');
+                setFormError(`Critical error: Dropdown fields with invalid dropdownOptions format: ${fieldNames.join(', ')}. dropdownOptions must be an array of strings.`);
+                setFormLoading(false);
+                return;
+            }
+            
+            console.log('✅ All validation passed, form data is ready to send');
+            
+            // Also log the original fields state to debug the mapping
+            console.log('=== ORIGINAL FIELDS STATE DEBUG ===');
+            fields.forEach((field, index) => {
+                if (field.type === 'dropdown') {
+                    console.log(`Original Field ${index + 1} (${field.name}):`, {
+                        type: field.type,
+                        options: field.options,
+                        optionsCount: field.options?.length || 0,
+                        optionValues: field.options?.map(opt => opt.value) || []
+                    });
+                }
+            });
             console.log('=== SUBCATEGORY ASSIGNMENT DEBUG ===');
             console.log('selectedSubCategory value:', selectedSubCategory);
             console.log('selectedSubCategory type:', typeof selectedSubCategory);
@@ -1600,6 +2032,19 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
             console.log('=== END DEBUG ===');
             
             let savedFormId = editingFormId;
+            
+            // Final log before sending data
+            console.log('🚀 SENDING FORM DATA TO API:', {
+                formName: formData.name,
+                categoryId: formData.categoryId,
+                subCategoryId: formData.subCategoryId,
+                fieldsCount: formData.fields.length,
+                dropdownFieldsCount: formData.fields.filter(f => f.type === 'dropdown').length,
+                allFields: formData.fields
+            });
+            
+
+            
             if (editingFormId) {
                 console.log('Updating existing form with ID:', editingFormId);
                 
@@ -1743,8 +2188,27 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                 + Add Option
                             </button>
                         </div>
+                        
+                        {/* Helpful message for dropdown fields */}
+                        {(!field.options || field.options.length === 0) && (
+                            <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                                <p className="text-xs text-yellow-700">
+                                    ⚠️ <strong>No options added yet!</strong> Dropdown fields must have at least one option to be saved.
+                                </p>
+                            </div>
+                        )}
+                        
+                        {/* Validation message for empty option values */}
+                        {field.options && field.options.length > 0 && field.options.some(opt => !opt.value || !opt.value.trim()) && (
+                            <div className="p-2 bg-red-50 border border-red-200 rounded-md">
+                                <p className="text-xs text-red-700">
+                                    ❌ <strong>Empty option values detected!</strong> Please fill in all option values before saving.
+                                </p>
+                            </div>
+                        )}
+                        
                         <div className="space-y-1">
-                            {field.options.map(option => (
+                            {field.options && field.options.length > 0 ? field.options.map(option => (
                                 <div key={option.id} className="flex items-center gap-2">
                                     <input
                                         type="text"
@@ -1761,7 +2225,11 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                         <FaTimes />
                                     </button>
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="text-center py-2 text-gray-500 text-sm">
+                                    No options added yet. Click "+ Add Option" above to get started.
+                                </div>
+                            )}
                         </div>
                     </div>
                 );
@@ -1841,10 +2309,10 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                 />
                             )}
                             {field.type === 'dropdown' && (
-                                <select className="w-full p-2 border border-gray-300 rounded-md" disabled>
+                                <select className="w-full p-2 border border-gray-300 rounded-md">
                                     <option value="">Select an option...</option>
-                                    {field.options.map((option, index) => (
-                                        <option key={index} value={option.value}>
+                                    {field.options && Array.isArray(field.options) && field.options.map((option, index) => (
+                                        <option key={option.id || index} value={option.value}>
                                             {option.value}
                                         </option>
                                     ))}
@@ -1911,6 +2379,17 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                 Found {filteredForms?.length || 0} form(s) matching &quot;{searchTerm}&quot;
                             </p>
                         )}
+                    </div>
+
+                    {/* Clone functionality info */}
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <div className="flex items-start gap-2">
+                            <FaClipboardList className="text-blue-600 mt-0.5 flex-shrink-0" />
+                            <div className="text-sm text-blue-800">
+                                <p className="font-medium mb-1">💡 Form Cloning Available</p>
+                                <p>Use the <span className="font-mono bg-blue-100 px-1 rounded">📋</span> button to clone any existing form. This creates an exact copy with all fields and settings, allowing you to quickly create similar forms with minor modifications.</p>
+                            </div>
+                        </div>
                     </div>
 
                     {formsLoading ? (
@@ -1998,6 +2477,27 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                                             e.stopPropagation();
                                                             const formId = getFormId(form);
                                                             if (formId) {
+                                                                // Clone the form
+                                                                const formToClone = forms.find(f => getFormId(f) === formId);
+                                                                if (formToClone) {
+                                                                    handleCloneForm(formToClone);
+                                                                } else {
+                                                                    toast.error('Form not found for cloning');
+                                                                }
+                                                            } else {
+                                                                toast.error('Cannot clone: Invalid form ID');
+                                                            }
+                                                        }}
+                                                        className="text-green-600 hover:text-green-800"
+                                                        title="Clone Form"
+                                                    >
+                                                        <FaClipboardList />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const formId = getFormId(form);
+                                                            if (formId) {
                                                                 onDeleteForm(formId);
                                                             } else {
                                                                 toast.error('Cannot delete: Invalid form ID');
@@ -2055,6 +2555,19 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                             </h3>
                         </div>
                     </div>
+
+                    {/* Show clone indicator if form name contains "(Copy)" */}
+                    {formName.includes('(Copy)') && (
+                        <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-md">
+                            <div className="flex items-center gap-2">
+                                <FaClipboardList className="text-green-600" />
+                                <div className="text-sm text-green-800">
+                                    <p className="font-medium">✅ Form Cloned Successfully</p>
+                                    <p>This form was cloned from an existing form. You can now modify the fields, change the name, and save it as a new form.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[calc(100vh-300px)] min-h-[600px]">
                         {/* CREATE FORM VIEW - Form Details Section */}
@@ -2145,11 +2658,24 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                 </div>
 
                                 <div>
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
-                                        <span className="text-sm text-gray-500">
-                                            {fields.length}/15 fields
-                                        </span>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
+                                            <span className="text-sm text-gray-500">
+                                                {fields.length}/15 fields
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={addField}
+                                            disabled={fields.length >= 15}
+                                            className={`px-4 py-2 rounded-md flex items-center gap-2 font-medium transition-all duration-200 ${
+                                                fields.length >= 15
+                                                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                            }`}
+                                        >
+                                            <FaPlus /> Add Field
+                                        </button>
                                     </div>
 
                                     {fields.length === 0 && (
@@ -2248,7 +2774,13 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                     </button>
                                     <button
                                         onClick={handleSaveForm}
-                                        className="flex-1 px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium transition-colors duration-200"
+                                        disabled={formLoading || !canSaveForm()}
+                                        title={!canSaveForm() ? "Please fill in all required fields and ensure dropdown fields have valid options" : ""}
+                                        className={`flex-1 px-6 py-3 rounded-md font-medium transition-colors duration-200 ${
+                                            formLoading || !canSaveForm()
+                                                ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                                                : 'bg-green-600 text-white hover:bg-green-700'
+                                        }`}
                                     >
                                         {formLoading ? 'Saving...' : 'Save Form'}
                                     </button>
@@ -2279,6 +2811,19 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                             </h3>
                         </div>
                     </div>
+
+                    {/* Show clone indicator if form name contains "(Copy)" */}
+                    {formName.includes('(Copy)') && (
+                        <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-md">
+                            <div className="flex items-center gap-2">
+                                <FaClipboardList className="text-green-600" />
+                                <div className="text-sm text-green-800">
+                                    <p className="font-medium">✅ Form Cloned Successfully</p>
+                                    <p>This form was cloned from an existing form. You can now modify the fields, change the name, and save it as a new form.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[calc(100vh-300px)] min-h-[600px]">
                         {/* EDIT FORM VIEW - Form Details Section */}
@@ -2361,11 +2906,24 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                 </div>
 
                                 <div>
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
-                                        <span className="text-sm text-gray-500">
-                                            {fields.length}/15 fields
-                                        </span>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
+                                            <span className="text-sm text-gray-500">
+                                                {fields.length}/15 fields
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={addField}
+                                            disabled={fields.length >= 15}
+                                            className={`px-4 py-2 rounded-md flex items-center gap-2 font-medium transition-all duration-200 ${
+                                                fields.length >= 15
+                                                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                            }`}
+                                        >
+                                            <FaPlus /> Add Field
+                                        </button>
                                     </div>
 
                                     {fields.length === 0 && (
@@ -2464,8 +3022,13 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                     </button>
                                     <button
                                         onClick={handleSaveForm}
-                                        disabled={formLoading || !formName.trim() || !selectedCategory || fields.length === 0}
-                                        className="flex-1 px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 cursor-not-allowed font-medium"
+                                        disabled={formLoading || !canSaveForm()}
+                                        title={!canSaveForm() ? "Please fill in all required fields and ensure dropdown fields have valid options" : ""}
+                                        className={`flex-1 px-6 py-3 rounded-md font-medium ${
+                                            formLoading || !canSaveForm()
+                                                ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                                                : 'bg-green-600 text-white hover:bg-green-700'
+                                        }`}
                                     >
                                         {formLoading ? 'Saving...' : 'Update Form'}
                                     </button>
@@ -4977,6 +5540,98 @@ const AssetSettingsPage = () => {
     };
 
     // Custom Form management functions
+    const handleCloneForm = (formToClone) => {
+        console.log('handleCloneForm called from main component with form:', formToClone);
+        
+        // Set view to create mode
+        setView('create');
+        setEditingFormId(null);
+        
+        // Clone the form name with "(Copy)" suffix
+        const originalName = formToClone.name || 'Untitled Form';
+        const clonedName = `${originalName} (Copy)`;
+        setFormName(clonedName);
+        
+        // Clone the category and subcategory
+        const clonedCategoryId = formToClone.assignedCategoryId || formToClone.categoryId || '';
+        const clonedSubCategoryId = formToClone.assignedSubCategoryId || formToClone.subCategoryId || formToClone.subCategory?.id || '';
+        
+        setSelectedCategory(clonedCategoryId);
+        setSelectedSubCategory(clonedSubCategoryId);
+        
+        // Clone all fields with new IDs to avoid conflicts
+        if (formToClone.fields && Array.isArray(formToClone.fields)) {
+            const clonedFields = formToClone.fields.map((field, index) => ({
+                id: `field_${Date.now()}_${index}_${Math.random()}`, // Generate new unique ID
+                name: field.fieldLabel || field.fieldName || field.name || '',
+                type: field.fieldType || field.type || 'text',
+                required: Boolean(field.required),
+                placeholder: field.defaultValue || field.placeholder || '',
+                options: []
+            }));
+
+            // Handle dropdown options for cloned fields
+            clonedFields.forEach((field, index) => {
+                if (field.type === 'dropdown') {
+                    const originalField = formToClone.fields[index];
+                    
+                    // Check for options in different possible formats
+                    if (originalField.options && Array.isArray(originalField.options)) {
+                        if (originalField.options.length > 0 && typeof originalField.options[0] === 'string') {
+                            // New format: options array of strings
+                            field.options = originalField.options.map((opt, optIndex) => ({
+                                id: `option_${Date.now()}_${optIndex}_${Math.random()}`,
+                                value: opt
+                            }));
+                        } else {
+                            // Legacy format: options array of objects
+                            field.options = originalField.options.map((opt, optIndex) => ({
+                                id: `option_${Date.now()}_${optIndex}_${Math.random()}`,
+                                value: typeof opt === 'string' ? opt : opt.value || opt.label || ''
+                            }));
+                        }
+                    } else if (originalField.dropdownOptions && Array.isArray(originalField.dropdownOptions)) {
+                        // Fallback: check for dropdownOptions
+                        field.options = originalField.dropdownOptions.map((opt, optIndex) => ({
+                            id: `option_${Date.now()}_${optIndex}_${Math.random()}`,
+                            value: typeof opt === 'string' ? opt : opt.value || opt.label || ''
+                        }));
+                    }
+                }
+            });
+            
+            setFields(clonedFields);
+            console.log('Cloned fields:', clonedFields);
+        } else {
+            setFields([]);
+        }
+        
+        // Clear any errors
+        setFormError('');
+        setFieldErrors({
+            formName: '',
+            category: '',
+            subCategory: '',
+            fields: []
+        });
+        
+        // Clear current form from Redux
+        dispatch(clearCurrentForm());
+        
+        // Switch to custom form builder tab
+        setActiveTab('customFields');
+        
+        // Show success message
+        toast.success(`Form "${originalName}" cloned successfully! You can now modify the fields and save as a new form.`);
+        
+        console.log('Form cloned successfully:', {
+            name: clonedName,
+            categoryId: clonedCategoryId,
+            subCategoryId: clonedSubCategoryId,
+            fieldsCount: formToClone.fields?.length || 0
+        });
+    };
+
     const handleDeleteForm = (formId) => {
         // Validate formId before proceeding
         if (!formId || formId === 'undefined' || formId === undefined) {

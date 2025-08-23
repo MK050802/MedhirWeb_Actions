@@ -30,10 +30,10 @@ export const fetchPayments = createAsyncThunk(
 // fetch payments of vendor
 export const fetchPaymentsOfVendor = createAsyncThunk(
     "vendorPayments/fetchPaymentsOfVendor",
-    async (vendorId, { rejectWithValue }) => {
+    async ({ vendorId, companyId }, { rejectWithValue }) => {
         try {
         const token = getItemFromSessionStorage("token", null);
-        const response = await fetch(`${API_BASE_URL}/vendor/${vendorId}`, {
+        const response = await fetch(`${API_BASE_URL}?companyId=${companyId}&vendorId=${vendorId}`, {
             headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -43,7 +43,7 @@ export const fetchPaymentsOfVendor = createAsyncThunk(
         if (!response.ok) {
             return rejectWithValue(data.message || "Something went wrong");
         }
-        return data;
+        return { vendorId, payments: data };
         } catch (error) {
         return rejectWithValue(error.message || "Network Error");
         }
@@ -56,18 +56,63 @@ export const addPayment = createAsyncThunk(
     async (payment, { rejectWithValue }) => {
         try {
         const token = getItemFromSessionStorage("token", null);
+        const companyId = sessionStorage.getItem('employeeCompanyId');
+        
+        if (!companyId) {
+            return rejectWithValue('Company ID not found in session storage');
+        }
+        
+        // Add companyId to the payment data if not already present
+        const paymentData = new FormData();
+        const paymentJson = JSON.parse(payment.get('payment'));
+        paymentJson.companyId = companyId;
+        
+        // Re-append the updated payment data
+        paymentData.append('payment', JSON.stringify(paymentJson));
+        
+        // Append all other form data
+        for (let [key, value] of payment.entries()) {
+            if (key !== 'payment') {
+                paymentData.append(key, value);
+            }
+        }
+        
         const response = await fetch(`${API_BASE_URL}`, {
             method: "POST",
             headers: {
             Authorization: `Bearer ${token}`,
             },
-            body: payment,
+            body: paymentData,
         });
         const data = await response.json();
         if (!response.ok) {
             return rejectWithValue(data.message || "Something went wrong");
         }
-        return data;
+        
+        // Handle different response formats from backend
+        let paymentResult = null;
+        
+        if (data && data.payment) {
+            // Backend returned complete payment data
+            paymentResult = data.payment;
+        } else if (data && data.data) {
+            // Backend returned data in nested structure
+            paymentResult = data.data;
+        } else if (data && data.success) {
+            // Backend only returned success message, construct payment object from request
+            paymentResult = {
+                ...paymentJson,
+                paymentId: `PAY-${Date.now()}`, // Generate temporary ID
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                status: 'Active'
+            };
+        } else {
+            // Backend returned raw data or unexpected format
+            paymentResult = data;
+        }
+        
+        return paymentResult;
         } catch (error) {
         return rejectWithValue(error.message || "Network Error");
         }
@@ -80,18 +125,61 @@ export const updatePayment = createAsyncThunk(
     async ({ paymentId, payment }, { rejectWithValue }) => {
         try {
         const token = getItemFromSessionStorage("token", null);
+        const companyId = sessionStorage.getItem('employeeCompanyId');
+        
+        if (!companyId) {
+            return rejectWithValue('Company ID not found in session storage');
+        }
+        
+        // Add companyId to the payment data if not already present
+        const paymentData = new FormData();
+        const paymentJson = JSON.parse(payment.get('payment'));
+        paymentJson.companyId = companyId;
+        
+        // Re-append the updated payment data
+        paymentData.append('payment', JSON.stringify(paymentJson));
+        
+        // Append all other form data
+        for (let [key, value] of payment.entries()) {
+            if (key !== 'payment') {
+                paymentData.append(key, value);
+            }
+        }
+        
         const response = await fetch(`${API_BASE_URL}/${paymentId}`, {
             method: "PUT",
             headers: {
             Authorization: `Bearer ${token}`,
             },
-            body: payment,
+            body: paymentData,
         });
         const data = await response.json();
         if (!response.ok) {
             return rejectWithValue(data.message || "Something went wrong");
         }
-        return data;
+        
+        // Handle different response formats from backend
+        let paymentResult = null;
+        
+        if (data && data.payment) {
+            // Backend returned complete payment data
+            paymentResult = data.payment;
+        } else if (data && data.data) {
+            // Backend returned data in nested structure
+            paymentResult = data.data;
+        } else if (data && data.success) {
+            // Backend only returned success message, construct payment object from request
+            paymentResult = {
+                ...paymentJson,
+                paymentId: paymentId,
+                updatedAt: new Date().toISOString()
+            };
+        } else {
+            // Backend returned raw data or unexpected format
+            paymentResult = data;
+        }
+        
+        return paymentResult;
         } catch (error) {
         return rejectWithValue(error.message || "Network Error");
         }
@@ -102,7 +190,7 @@ const paymentSlice = createSlice({
     name: "payments",
     initialState: {
         payments: [],
-        vendorPayments: [],
+        vendorPayments: {}, // Store vendor payments by vendorId
         loading: false,
         error: null,
     },
@@ -126,7 +214,7 @@ const paymentSlice = createSlice({
         });
         builder.addCase(fetchPaymentsOfVendor.fulfilled, (state, action) => {
             state.loading = false;
-            state.vendorPayments = action.payload;
+            state.vendorPayments[action.payload.vendorId] = action.payload.payments;
         });
         builder.addCase(fetchPaymentsOfVendor.rejected, (state, action) => {
             state.loading = false;

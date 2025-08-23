@@ -137,6 +137,19 @@ const CustomFormRenderer = ({ customForms, customFormData, setCustomFormData, se
         const isRequired = field.required !== undefined ? field.required : false;
         const placeholder = field.placeholder || field.defaultValue || '';
         const options = field.options || [];
+        
+        // Debug logging for field structure
+        console.log('Field structure from backend:', {
+            fieldId: field.id,
+            fieldName,
+            fieldType,
+            isRequired,
+            hasOptions: !!field.options,
+            optionsCount: field.options?.length || 0,
+            hasDropdownOptions: !!field.dropdownOptions,
+            dropdownOptionsCount: field.dropdownOptions?.length || 0,
+            rawField: field
+        });
 
         const fieldValue = customFormData[form.id]?.[field.id] || '';
         
@@ -166,21 +179,100 @@ const CustomFormRenderer = ({ customForms, customFormData, setCustomFormData, se
                 );
             case 'dropdown':
             case 'select':
+                // Handle different option formats from backend
+                let dropdownOptions = [];
+                
+                if (options && Array.isArray(options)) {
+                    // Check if options are strings or objects
+                    if (options.length > 0 && typeof options[0] === 'string') {
+                        // Options are array of strings
+                        dropdownOptions = options.map((opt, index) => ({
+                            value: opt,
+                            label: opt
+                        }));
+                    } else {
+                        // Options are array of objects
+                        dropdownOptions = options.map((opt, index) => ({
+                            value: opt.value || opt.label || opt.name || opt,
+                            label: opt.label || opt.name || opt.value || opt
+                        }));
+                    }
+                }
+                
+                // Also check for dropdownOptions field (backend might use this)
+                if (field.dropdownOptions && Array.isArray(field.dropdownOptions)) {
+                    if (field.dropdownOptions.length > 0 && typeof field.dropdownOptions[0] === 'string') {
+                        dropdownOptions = field.dropdownOptions.map((opt, index) => ({
+                            value: opt,
+                            label: opt
+                        }));
+                    } else {
+                        dropdownOptions = field.dropdownOptions.map((opt, index) => ({
+                            value: opt.value || opt.label || opt.name || opt,
+                            label: opt.label || opt.name || opt.value || opt
+                        }));
+                    }
+                }
+                
+                // Additional fallbacks for different backend field structures
+                if (dropdownOptions.length === 0) {
+                    // Check for other possible option fields
+                    const possibleOptionFields = ['choices', 'values', 'selections', 'items', 'list'];
+                    for (const fieldName of possibleOptionFields) {
+                        if (field[fieldName] && Array.isArray(field[fieldName])) {
+                            console.log(`Found options in field.${fieldName}:`, field[fieldName]);
+                            if (typeof field[fieldName][0] === 'string') {
+                                dropdownOptions = field[fieldName].map((opt, index) => ({
+                                    value: opt,
+                                    label: opt
+                                }));
+                            } else {
+                                dropdownOptions = field[fieldName].map((opt, index) => ({
+                                    value: opt.value || opt.label || opt.name || opt,
+                                    label: opt.label || opt.name || opt.value || opt
+                                }));
+                            }
+                            break;
+                        }
+                    }
+                }
+                
+                console.log('Dropdown field options:', {
+                    fieldName,
+                    originalOptions: options,
+                    dropdownOptions: field.dropdownOptions,
+                    processedOptions: dropdownOptions
+                });
+                
                 return (
-                    <SelectField
-                        key={field.id}
-                        label={`${fieldName}${isRequired ? ' *' : ''}`}
-                        value={fieldValue}
-                        onChange={(e) => handleCustomFieldChange(form.id, field.id, e.target.value)}
-                        error={validationErrors[`custom_${form.id}_${field.id}`]}
-                    >
-                        <option value="">Select {fieldName}...</option>
-                        {options && Array.isArray(options) && options.map((option, index) => (
-                            <option key={option.value || option || index} value={option.value || option}>
-                                {option.label || option}
-                            </option>
-                        ))}
-                    </SelectField>
+                    <div key={field.id}>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            {fieldName}{isRequired ? ' *' : ''}
+                        </label>
+                        {dropdownOptions.length > 0 ? (
+                            <select
+                                value={fieldValue || ''}
+                                onChange={(e) => handleCustomFieldChange(form.id, field.id, e.target.value)}
+                                className={`w-full p-2 border rounded-md shadow-sm ${validationErrors[`custom_${form.id}_${field.id}`] ? 'border-red-500' : 'border-gray-300'}`}
+                            >
+                                <option value="">Select {fieldName}...</option>
+                                {dropdownOptions.map((option, index) => (
+                                    <option key={option.value || index} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <div className="p-3 border border-yellow-300 rounded-md bg-yellow-50">
+                                <p className="text-sm text-yellow-800">
+                                    ⚠️ No options available for this dropdown field. Please contact an administrator.
+                                </p>
+                            </div>
+                        )}
+                        {validationErrors[`custom_${form.id}_${field.id}`] && (
+                            <p className="mt-1 text-sm text-red-600">{validationErrors[`custom_${form.id}_${field.id}`]}</p>
+                        )}
+                    </div>
                 );
             case 'textarea':
                 return (
@@ -308,7 +400,6 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
         purchaseDate: '', 
         invoiceNumber: '', 
         purchaseCost: '',
-        gstRate: '', 
         invoiceScan: null,
         warrantyExpiry: '',
 
@@ -594,9 +685,7 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
         if (!formData.purchaseDate) {
             newValidationErrors.purchaseDate = "Please enter the purchase date";
         }
-        if (!formData.purchaseCost) {
-            newValidationErrors.purchaseCost = "Please enter the purchase cost";
-        }
+        // Purchase cost is now optional, so no validation required
         if (!formData.location) {
             newValidationErrors.location = "Please select a location";
         }
@@ -677,7 +766,7 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
                 purchaseCost: formData.purchaseCost ? parseFloat(formData.purchaseCost) : null,
                 invoiceNumber: formData.invoiceNumber || null,
                 warrantyExpiry: formData.warrantyExpiry || null,
-                gstRate: formData.gstRate ? parseFloat(formData.gstRate) : null,
+
                 inputTaxCreditEligible: true,
                 createdBy: employeeId,
             };
@@ -688,7 +777,7 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
             console.log('formData.purchaseDate:', formData.purchaseDate, '-> purchaseDate:', assetData.purchaseDate);
             console.log('formData.purchaseCost:', formData.purchaseCost, '-> purchaseCost:', assetData.purchaseCost);
             console.log('formData.invoiceNumber:', formData.invoiceNumber, '-> invoiceNumber:', assetData.invoiceNumber);
-            console.log('formData.gstRate:', formData.gstRate, '-> gstRate:', assetData.gstRate);
+    
             console.log('formData.warrantyExpiry:', formData.warrantyExpiry, '-> warrantyExpiry:', assetData.warrantyExpiry);
             
             // Validate required fields
@@ -900,7 +989,7 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
             // Reset form
             setFormData({
                 category: '', subcategory: '', location: '', purchaseDate: '', invoiceNumber: '', purchaseCost: '',
-                gstRate: '', invoiceScan: null, warrantyExpiry: '',
+                invoiceScan: null, warrantyExpiry: '',
                 statusLabelId: ''
             });
             setGeneratedAssetId('');
@@ -1068,20 +1157,12 @@ const AddAssetModal = ({ isOpen, onClose, onSubmit }) => {
                                 onChange={handleChange}
                             />
                             <InputField 
-                                label="Purchase Cost (Gross) *" 
+                                label="Purchase Cost (Gross)" 
                                 name="purchaseCost" 
                                 value={formData.purchaseCost}
                                 onChange={handleChange}
                                 type="number" 
-                                error={validationErrors.purchaseCost}
-                            />
-                            <InputField 
-                                label="GST Rate (%)" 
-                                name="gstRate" 
-                                value={formData.gstRate}
-                                onChange={handleChange}
-                                type="number" 
-                                placeholder="e.g., 18" 
+                                placeholder="Enter purchase cost"
                             />
                             <InputField 
                                 label="Warranty Expiry Date" 
