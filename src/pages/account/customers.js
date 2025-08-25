@@ -483,11 +483,17 @@ const Customers = () => {
   const [showCustomDateInputs, setShowCustomDateInputs] = useState(false);
 
   useEffect(() => {
-    dispatch(fetchReceipts());
+    const companyId = sessionStorage.getItem("employeeCompanyId");
+    if (companyId) {
+      dispatch(fetchReceipts(companyId));
+    }
   }, [dispatch]);
   
   useEffect(() => {
-    dispatch(fetchInvoices());
+    const companyId = sessionStorage.getItem("employeeCompanyId");
+    if (companyId) {
+      dispatch(fetchInvoices(companyId));
+    }
   }, [dispatch]);
 
   useEffect(() => {
@@ -1411,4 +1417,4 @@ const handleInvoiceSubmit = (data) => {
   );
 };
 
-export default Customers; 
+export default Customers;

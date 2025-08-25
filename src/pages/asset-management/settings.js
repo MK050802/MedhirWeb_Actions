@@ -1297,7 +1297,7 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                     }));
                 } else {
                     // Legacy format: options array of objects
-                    mappedField.options = apiField.options.map((opt, optIndex) => ({
+                mappedField.options = apiField.options.map((opt, optIndex) => ({
                         id: `option_${Date.now()}_${optIndex}_${Math.random()}`,
                         value: typeof opt === 'string' ? opt : opt.value || opt.label || ''
                     }));
@@ -1685,10 +1685,10 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                 // Check if options exist and have values
                 if (!field.options || !Array.isArray(field.options) || field.options.length === 0) {
                     setFormError(`Dropdown field "${field.name}" must have at least one option`);
-                    hasErrors = true;
-                    break;
-                }
-                
+                hasErrors = true;
+                break;
+            }
+            
                 // Check for empty option values
                 const invalidOptions = field.options.filter(opt => !opt.value || !opt.value.trim());
                 if (invalidOptions.length > 0) {
@@ -1834,10 +1834,10 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                         }
                         
                         return {
-                            name: field.name.trim(),
-                            type: field.type,
-                            required: field.required || false,
-                            placeholder: field.placeholder || '',
+                    name: field.name.trim(),
+                    type: field.type,
+                    required: field.required || false,
+                    placeholder: field.placeholder || '',
                             dropdownOptions: optionValues  // Backend expects 'dropdownOptions' array
                         };
                     }
@@ -2660,10 +2660,10 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center gap-3">
-                                            <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
-                                            <span className="text-sm text-gray-500">
-                                                {fields.length}/15 fields
-                                            </span>
+                                        <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
+                                        <span className="text-sm text-gray-500">
+                                            {fields.length}/15 fields
+                                        </span>
                                         </div>
                                         <button
                                             onClick={addField}
@@ -2908,10 +2908,10 @@ const CustomFormBuilder = ({ editing, onDeleteForm, activeTab, view, setView, ed
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center gap-3">
-                                            <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
-                                            <span className="text-sm text-gray-500">
-                                                {fields.length}/15 fields
-                                            </span>
+                                        <h4 className="font-semibold text-gray-800">➕ Form Fields</h4>
+                                        <span className="text-sm text-gray-500">
+                                            {fields.length}/15 fields
+                                        </span>
                                         </div>
                                         <button
                                             onClick={addField}

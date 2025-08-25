@@ -213,7 +213,7 @@ const SalesHeader = ({ lead, pipelines, onStatusChange }) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                 </svg>
                 <span className="text-blue-700 font-medium">Move Bucket</span>
-              </div>
+      </div>
             </SelectTrigger>
             <SelectContent className="rounded-md shadow-lg max-h-60 overflow-y-auto w-64">
               <div className="p-2 border-b border-gray-200">
@@ -222,15 +222,15 @@ const SalesHeader = ({ lead, pipelines, onStatusChange }) => {
               {pipelines.filter(stage => stage.stageId && stage.stageId !== "").map((stage) => {
                 const currentStageId = lead.stageId;
                 const isCurrentStage = stage.stageId === currentStageId;
-                const stageIcons = {
-                  'LOST': '❌',
-                  'JUNK': '🗑️',
-                  'CONVERTED': '✅',
-                  'ASSIGNED': '👥',
-                  'SEMI': '📞',
-                  'POTENTIAL': '⭐',
-                  'HIGHPOTENTIAL': '🌟'
-                };
+                // const stageIcons = {
+                //   'LOST': '❌',
+                //   'JUNK': '🗑️',
+                //   'CONVERTED': '✅',
+                //   'ASSIGNED': '👥',
+                //   'SEMI': '📞',
+                //   'POTENTIAL': '⭐',
+                //   'HIGHPOTENTIAL': '🌟'
+                // };
                 
                 return (
                   <SelectItem 
@@ -240,7 +240,7 @@ const SalesHeader = ({ lead, pipelines, onStatusChange }) => {
                     className={`${isCurrentStage ? 'bg-gray-100 text-gray-400' : 'hover:bg-blue-50'} py-2 px-3`}
                   >
                     <div className="flex items-center gap-3 w-full">
-                      <span className="text-lg">{stageIcons[stage.formType] || '📋'}</span>
+                      {/* <span className="text-lg">{stageIcons[stage.formType] || '📋'}</span> */}
                       <div className="flex-1">
                         <span className={`${isCurrentStage ? 'text-gray-400' : 'text-gray-900'} font-medium text-sm`}>
                           {stage.name}
@@ -318,7 +318,7 @@ const SalesDetailBody = ({
   // Removed handleAddConversationLog (now using simplified notes system)
 
   // Removed bulk task suggestion functions (now using simple single task creation per conversation)
-  
+
   // Task management functions for summaries form
   const handleAddSummaryTask = () => {
     if (!newTaskText.trim()) return;
@@ -335,7 +335,7 @@ const SalesDetailBody = ({
     };
     
     setSummaryTasks([...summaryTasks, newTask]);
-    setNewTaskText("");
+      setNewTaskText("");
     setNewTaskDueDate("");
     setShowTaskInput(false);
   };
@@ -374,6 +374,39 @@ const SalesDetailBody = ({
     requirements: lead.requirements || "",
   });
 
+  const [highPotentialFields, setHighPotentialFields] = useState({
+    requirements: lead.requirements || "",
+    finalQuotation: lead.finalQuotation || "",
+    discount: lead.discount || "",
+    designTimeline: lead.designTimeline || "",
+    completionTimeline: lead.completionTimeline || "",
+  });
+  const [semiConvertedFields, setSemiConvertedFields] = useState({
+    freezingAmount: lead.freezingAmount || "",
+    freezingPaymentDate: lead.freezingPaymentDate || "",
+    freezingPaymentMode: lead.freezingPaymentMode || "",
+  });
+  const [freezingProofFile, setFreezingProofFile] = useState(null);
+
+  // Converted section state
+  const [convertedFields, setConvertedFields] = useState({
+    signupAmount: lead.signupAmount || "",
+    paymentDate: lead.paymentDate || "",
+    paymentMode: lead.paymentMode || "",
+    paymentTransactionId: lead.paymentTransactionId || "",
+    panNumber: lead.panNumber || "",
+    gstAvailable: lead.gstAvailable || false,
+    gst: lead.gst || "",
+  });
+  const [paymentDetailsFile, setPaymentDetailsFile] = useState(null);
+  const [bookingFormFile, setBookingFormFile] = useState(null);
+  const [paymentTerms, setPaymentTerms] = useState([
+    { stage: 1, percentage: 10, description: "Booking Amount to start the Design Phase" },
+    { stage: 2, percentage: 10, description: "After 3D, Material selection & Before 2D details" },
+    { stage: 3, percentage: 45, description: "After sign off, Before moving it to production" },
+    { stage: 4, percentage: 35, description: "Before factory material dispatch to site" }
+  ]);
+
   // --- Assigned Team Edit State ---
   const [isEditingTeam, setIsEditingTeam] = useState(false);
   const [assignedSalesRep, setAssignedSalesRep] = useState("");
@@ -390,6 +423,13 @@ const SalesDetailBody = ({
     const salesRepEmployee = managerEmployees.find(emp => emp.employeeId === lead.salesRep);
     const designerEmployee = managerEmployees.find(emp => emp.employeeId === lead.designer);
     
+    console.log("Team assignment useEffect - lead data:", {
+      leadSalesRep: lead.salesRep,
+      leadDesigner: lead.designer,
+      salesRepEmployee,
+      designerEmployee
+    });
+    
     setAssignedSalesRep(salesRepEmployee?.name || "");
     setAssignedDesigner(designerEmployee?.name || "");
     setAssignedSalesRepId(lead.salesRep || "");
@@ -398,7 +438,7 @@ const SalesDetailBody = ({
     // Initialize dropdown states - keep closed by default
     setSalesDropdownOpen(false);
     setDesignerDropdownOpen(false);
-  }, [lead, managerEmployees]);
+  }, [lead.salesRep, lead.designer, managerEmployees]);
   // --- End Assigned Team Edit State ---
 
   useEffect(() => {
@@ -410,8 +450,6 @@ const SalesDetailBody = ({
       leadSource: lead.leadSource || "",
       referralName: lead.referralName || "",
       designStyle: lead.designStyle || "",
-      designTimeline: lead.designTimeline || "",
-      completionTimeline: lead.completionTimeline || "",
     });
     setContactedFields({
       floorPlan: lead.floorPlan || "",
@@ -422,6 +460,27 @@ const SalesDetailBody = ({
       firstMeetingDate: lead.firstMeetingDate || "",
       initialQuote: lead.initialQuote || lead.quotedAmount || "",
       requirements: lead.requirements || "",
+    });
+            setHighPotentialFields({
+          requirements: lead.requirements || "",
+          finalQuotation: lead.finalQuotation || "",
+          discount: lead.discount || "",
+          designTimeline: lead.designTimeline || "",
+          completionTimeline: lead.completionTimeline || "",
+        });
+        setSemiConvertedFields({
+          freezingAmount: lead.freezingAmount || "",
+          freezingPaymentDate: lead.freezingPaymentDate || "",
+          freezingPaymentMode: lead.freezingPaymentMode || "",
+    });
+        setConvertedFields({
+          signupAmount: lead.signupAmount || "",
+          paymentDate: lead.paymentDate || "",
+          paymentMode: lead.paymentMode || "",
+          paymentTransactionId: lead.paymentTransactionId || "",
+          panNumber: lead.panNumber || "",
+          gstAvailable: lead.gstAvailable || false,
+          gst: lead.gst || "",
     });
   }, [lead, isEditing]);
 
@@ -635,7 +694,7 @@ const SalesDetailBody = ({
   const handleContactedFieldChange = (field, value) => {
     // For files, store the file object temporarily for upload processing
     if (field === "floorPlan" && value instanceof File) {
-      setContactedFields((prev) => ({ ...prev, [field]: value }));
+    setContactedFields((prev) => ({ ...prev, [field]: value }));
     } else {
       setContactedFields((prev) => ({ ...prev, [field]: value }));
     }
@@ -643,6 +702,10 @@ const SalesDetailBody = ({
 
   const handlePotentialFieldChange = (field, value) => {
     setPotentialFields((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleHighPotentialFieldChange = (field, value) => {
+    setHighPotentialFields((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSaveProject = async () => {
@@ -779,11 +842,364 @@ const SalesDetailBody = ({
     }
   };
 
+  const saveHighPotentialField = async (field) => {
+    try {
+      const value = highPotentialFields[field];
+      // Required validations for High Potential fields
+      if (field === "requirements") {
+        if (!String(value || "").trim()) {
+          toast.error("Quotation Details are required");
+          return;
+        }
+      }
+      if (field === "finalQuotation") {
+        if (value === undefined || value === null || String(value).trim() === "") {
+          toast.error("Final Quoted Amount is required");
+          return;
+        }
+        if (isNaN(Number(value)) || Number(value) <= 0) {
+          toast.error("Final Quoted Amount must be a valid positive number");
+          return;
+        }
+      }
+      if (field === "discount") {
+        if (value === undefined || value === null || String(value).trim() === "") {
+          toast.error("Discount Percentage is required");
+          return;
+        }
+        const discountValue = Number(value);
+        if (isNaN(discountValue) || discountValue < 0 || discountValue > 100) {
+          toast.error("Discount Percentage must be between 0 and 100");
+          return;
+        }
+      }
+      if (field === "designTimeline") {
+        if (!String(value || "").trim()) {
+          toast.error("Design Timeline is required");
+          return;
+        }
+        if (String(value).trim().length < 3) {
+          toast.error("Design Timeline must be at least 3 characters");
+          return;
+        }
+        if (String(value).trim().length > 50) {
+          toast.error("Design Timeline must be less than 50 characters");
+          return;
+        }
+      }
+      if (field === "completionTimeline") {
+        if (!String(value || "").trim()) {
+          toast.error("Completion Timeline is required");
+          return;
+        }
+        if (String(value).trim().length < 3) {
+          toast.error("Completion Timeline must be at least 3 characters");
+          return;
+        }
+        if (String(value).trim().length > 50) {
+          toast.error("Completion Timeline must be less than 50 characters");
+          return;
+        }
+      }
+      const payload = {};
+      const numericFields = ["finalQuotation", "discount"];
+      payload[field] = numericFields.includes(field) && value !== "" && value !== null && value !== undefined
+        ? Number(value)
+        : value;
+      await axios.put(`${API_BASE_URL}/leads/${lead.leadId}`, payload, {
+        headers: { Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}` },
+      });
+      Object.entries(payload).forEach(([k, v]) => onFieldChange(k, v));
+      toast.success("Saved");
+    } catch (e) {
+      console.error("Auto-save failed for high potential", field, e);
+      toast.error("Failed to save. Please try again.");
+    }
+  };
+
+  const handleSemiConvertedFieldChange = (field, value) => {
+    setSemiConvertedFields((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFreezingProofFileChange = (e) => {
+    const file = e.target.files[0];
+    setFreezingProofFile(file);
+  };
+
+  const handleConvertedFieldChange = (field, value) => {
+    setConvertedFields((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handlePaymentDetailsFileChange = (e) => {
+    const file = e.target.files[0];
+    setPaymentDetailsFile(file);
+  };
+
+  const handleBookingFormFileChange = (e) => {
+    const file = e.target.files[0];
+    setBookingFormFile(file);
+  };
+
+  const handlePaymentTermChange = (index, field, value) => {
+    setPaymentTerms((prev) => 
+      prev.map((term, i) => 
+        i === index ? { ...term, [field]: value } : term
+      )
+    );
+  };
+
+  const saveSemiConvertedField = async (field) => {
+    try {
+      const value = semiConvertedFields[field];
+      
+      // Required validations for Semi Converted fields
+      if (field === "freezingAmount") {
+        if (value === undefined || value === null || String(value).trim() === "") {
+          toast.error("Freezing Amount is required");
+          return;
+        }
+        if (isNaN(Number(value)) || Number(value) <= 0) {
+          toast.error("Freezing Amount must be a valid positive number");
+          return;
+        }
+      }
+      if (field === "freezingPaymentDate") {
+        if (!String(value || "").trim()) {
+          toast.error("Payment Date is required");
+          return;
+        }
+      }
+      if (field === "freezingPaymentMode") {
+        if (!String(value || "").trim()) {
+          toast.error("Payment Mode is required");
+          return;
+        }
+      }
+
+      const payload = {};
+      const numericFields = ["freezingAmount"];
+      payload[field] = numericFields.includes(field) && value !== "" && value !== null && value !== undefined
+        ? Number(value)
+        : value;
+      
+      await axios.put(`${API_BASE_URL}/leads/${lead.leadId}`, payload, {
+        headers: { Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}` },
+      });
+      Object.entries(payload).forEach(([k, v]) => onFieldChange(k, v));
+      toast.success("Saved");
+    } catch (e) {
+      console.error("Auto-save failed for semi converted", field, e);
+      toast.error("Failed to save. Please try again.");
+    }
+  };
+
+    const saveFreezingProofFile = async () => {
+    if (!freezingProofFile) {
+      toast.error("Please select a proof file");
+      return;
+    }
+
+    // Validate required fields before uploading
+    if (!semiConvertedFields.freezingAmount || !semiConvertedFields.freezingPaymentDate || !semiConvertedFields.freezingPaymentMode) {
+      toast.error("Please fill in all required fields (Freezing Amount, Payment Date, Payment Mode) before uploading proof file");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      
+      // Add lead data as JSON string (matching FreezeLeadModal structure)
+      const leadData = {
+        freezingAmount: semiConvertedFields.freezingAmount,
+        freezingPaymentDate: semiConvertedFields.freezingPaymentDate,
+        freezingPaymentMode: semiConvertedFields.freezingPaymentMode
+      };
+      
+      formData.append('leadData', JSON.stringify(leadData));
+      formData.append('freezingAmountProofFile', freezingProofFile);
+
+      await axios.put(`${API_BASE_URL}/leads/freeze/${lead.leadId}`, formData, {
+        headers: {
+          Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      toast.success("Proof file uploaded successfully");
+      setFreezingProofFile(null);
+      
+      // Update the lead data in Redux store
+      Object.entries(leadData).forEach(([k, v]) => onFieldChange(k, v));
+    } catch (e) {
+      console.error("Failed to upload proof file", e);
+      toast.error("Failed to upload proof file. Please try again.");
+    }
+  };
+
+  const saveConvertedField = async (field) => {
+    try {
+      const value = convertedFields[field];
+      
+      // Required validations for Converted fields
+      if (field === "signupAmount") {
+        if (value === undefined || value === null || String(value).trim() === "") {
+          toast.error("Sign-up Amount is required");
+          return;
+        }
+        if (isNaN(Number(value)) || Number(value) <= 0) {
+          toast.error("Sign-up Amount must be a valid positive number");
+          return;
+        }
+      }
+      if (field === "paymentDate") {
+        if (!String(value || "").trim()) {
+          toast.error("Payment Date is required");
+          return;
+        }
+      }
+      if (field === "paymentMode") {
+        if (!String(value || "").trim()) {
+          toast.error("Payment Mode is required");
+          return;
+        }
+      }
+      if (field === "panNumber" && value && value.trim()) {
+        const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+        if (!panRegex.test(value.trim().toUpperCase())) {
+          toast.error("Please enter a valid PAN number (e.g., ABCDE1234F)");
+          return;
+        }
+      }
+      if (field === "gst" && convertedFields.gstAvailable && value && value.trim()) {
+        const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+        if (!gstRegex.test(value.trim())) {
+          toast.error("Please enter a valid GST number (e.g., 22AAAAA0000A1Z5)");
+          return;
+        }
+      }
+
+      const payload = {};
+      const numericFields = ["signupAmount"];
+      payload[field] = numericFields.includes(field) && value !== "" && value !== null && value !== undefined
+        ? Number(value)
+        : value;
+
+      await axios.put(`${API_BASE_URL}/leads/${lead.leadId}`, payload, {
+        headers: { Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}` },
+      });
+      Object.entries(payload).forEach(([k, v]) => onFieldChange(k, v));
+      toast.success("Saved");
+    } catch (e) {
+      console.error("Auto-save failed for converted", field, e);
+      toast.error("Failed to save. Please try again.");
+    }
+  };
+
+  const savePaymentDetailsFile = async () => {
+    if (!paymentDetailsFile) {
+      toast.error("Please select a payment details file");
+      return;
+    }
+
+    // Validate required fields before uploading
+    if (!convertedFields.signupAmount || !convertedFields.paymentDate || !convertedFields.paymentMode) {
+      toast.error("Please fill in all required fields (Sign-up Amount, Payment Date, Payment Mode) before uploading payment details file");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      
+      // Add lead data as JSON string (matching ConvertLeadModal structure)
+      const leadData = {
+        signupAmount: convertedFields.signupAmount,
+        paymentDate: convertedFields.paymentDate,
+        paymentMode: convertedFields.paymentMode,
+        paymentTransactionId: convertedFields.paymentTransactionId,
+        panNumber: convertedFields.panNumber,
+        gstAvailable: convertedFields.gstAvailable,
+        gst: convertedFields.gst
+      };
+      
+      formData.append('leadData', JSON.stringify(leadData));
+      formData.append('paymentDetailsFile', paymentDetailsFile);
+
+      await axios.post(`${API_BASE_URL}/leads/${lead.leadId}/convert-with-docs`, formData, {
+        headers: {
+          Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}`,
+        },
+      });
+      
+      toast.success("Payment details file uploaded successfully");
+      setPaymentDetailsFile(null);
+      
+      // Update the lead data in Redux store
+      Object.entries(leadData).forEach(([k, v]) => onFieldChange(k, v));
+    } catch (e) {
+      console.error("Failed to upload payment details file", e);
+      toast.error("Failed to upload payment details file. Please try again.");
+    }
+  };
+
+  const saveBookingFormFile = async () => {
+    if (!bookingFormFile) {
+      toast.error("Please select a booking form file");
+      return;
+    }
+
+    // Validate required fields before uploading
+    if (!convertedFields.signupAmount || !convertedFields.paymentDate || !convertedFields.paymentMode) {
+      toast.error("Please fill in all required fields (Sign-up Amount, Payment Date, Payment Mode) before uploading booking form file");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      
+      // Add lead data as JSON string (matching ConvertLeadModal structure)
+      const leadData = {
+        signupAmount: convertedFields.signupAmount,
+        paymentDate: convertedFields.paymentDate,
+        paymentMode: convertedFields.paymentMode,
+        paymentTransactionId: convertedFields.paymentTransactionId,
+        panNumber: convertedFields.panNumber,
+        gstAvailable: convertedFields.gstAvailable,
+        gst: convertedFields.gst
+      };
+      
+      formData.append('leadData', JSON.stringify(leadData));
+      formData.append('bookingFormFile', bookingFormFile);
+
+      await axios.post(`${API_BASE_URL}/leads/${lead.leadId}/convert-with-docs`, formData, {
+        headers: {
+          Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}`,
+        },
+      });
+      
+      toast.success("Booking form file uploaded successfully");
+      setBookingFormFile(null);
+      
+      // Update the lead data in Redux store
+      Object.entries(leadData).forEach(([k, v]) => onFieldChange(k, v));
+    } catch (e) {
+      console.error("Failed to upload booking form file", e);
+      toast.error("Failed to upload booking form file. Please try again.");
+    }
+  };
+
   const handleSaveTeam = async () => {
     try {
       const body = {};
-      if (assignedSalesRepId) body.salesRep = assignedSalesRepId;
-      if (assignedDesignerId) body.designer = assignedDesignerId;
+      // Always include both fields, even if they're empty strings (for unassigning)
+      body.salesRep = assignedSalesRepId || null;
+      body.designer = assignedDesignerId || null;
+      
+      console.log("handleSaveTeam - Current state:", {
+        assignedSalesRepId,
+        assignedDesignerId,
+        body
+      });
+      
       await axios.put(`${API_BASE_URL}/leads/${lead.leadId}`, body, {
         headers: {
           Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}`,
@@ -791,8 +1207,41 @@ const SalesDetailBody = ({
       });
       setIsEditingTeam(false);
       // Optimistic local update
-      if (assignedSalesRepId) onFieldChange("salesRep", assignedSalesRepId);
-      if (assignedDesignerId) onFieldChange("designer", assignedDesignerId);
+      onFieldChange("salesRep", assignedSalesRepId || null);
+      onFieldChange("designer", assignedDesignerId || null);
+      toast.success("Assigned team updated!");
+    } catch (e) {
+      console.error("Failed to update assigned team:", e);
+      toast.error("Failed to update assigned team");
+    }
+  };
+
+  const handleSaveTeamWithValues = async (salesRepId, designerId) => {
+    try {
+      const body = {};
+      // Always include both fields, even if they're empty strings (for unassigning)
+      body.salesRep = salesRepId || null;
+      body.designer = designerId || null;
+      
+      console.log("handleSaveTeamWithValues - Payload:", {
+        salesRepId,
+        designerId,
+        body
+      });
+      
+      await axios.put(`${API_BASE_URL}/leads/${lead.leadId}`, body, {
+        headers: {
+          Authorization: `Bearer ${getItemFromSessionStorage("token") || ""}`,
+        },
+      });
+      setIsEditingTeam(false);
+      
+      // Update Redux store with new lead data
+      await dispatch(fetchLeadById(lead.leadId));
+      
+      // Optimistic local update
+      onFieldChange("salesRep", salesRepId || null);
+      onFieldChange("designer", designerId || null);
       toast.success("Assigned team updated!");
     } catch (e) {
       console.error("Failed to update assigned team:", e);
@@ -1097,6 +1546,34 @@ const SalesDetailBody = ({
       return timeB.getTime() - timeA.getTime();
     });
 
+  // Add state for section navigation
+  const [currentSection, setCurrentSection] = useState(0);
+  
+  // Define sections in order
+  const sections = [
+    { id: 'contacted', name: 'Contacted' },
+    { id: 'potential', name: 'Potential' },
+    { id: 'highPotential', name: 'High Potential' },
+    { id: 'semiConverted', name: 'Semi Converted' },
+    { id: 'converted', name: 'Converted' }
+  ];
+
+  const nextSection = () => {
+    if (currentSection < sections.length - 1) {
+      setCurrentSection(currentSection + 1);
+    }
+  };
+
+  const prevSection = () => {
+    if (currentSection > 0) {
+      setCurrentSection(currentSection - 1);
+    }
+  };
+
+  const goToSection = (index) => {
+    setCurrentSection(index);
+  };
+
   return (
     <div className="flex-grow bg-gray-50 p-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1110,20 +1587,10 @@ const SalesDetailBody = ({
                 <span className="text-xs text-gray-500">
                   {activities?.filter(a => a.status !== "done" && a.id && !deletedActivityIds.has(a.id)).length || 0} tasks
                 </span>
-                {/* <button
-                  onClick={() => {
-                    setEditingActivity(null);
-                    setIsActivityModalOpen(true);
-                  }}
-                  className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition text-sm"
-                  title="Add Activity"
-                >
-                  +
-                </button> */}
               </div>
             </div>
             
-            <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+            <div className="max-h-40 overflow-y-auto space-y-1 pr-2">
               {activities && activities.length > 0 ? (
                 activities
                   .filter(
@@ -1135,33 +1602,26 @@ const SalesDetailBody = ({
                   .map((activity, index) => (
                     <div
                       key={activity.id || `temp-${index}`}
-                      className="bg-gray-50 rounded-md border border-gray-200 p-1 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                      className="flex items-center justify-between py-2 px-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
                     >
-                      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          {/* <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700 capitalize">
-                            {activity.type}
-                          </span> */}
-                          {/* <span className="text-blue-600 text-xs font-medium">
-                            {activity.status}
-                          </span> */}
-                        </div>
-                        <span className="font-medium text-gray-800 text-sm truncate">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium text-gray-800 text-sm truncate flex-1">
                           {activity.title}
                         </span>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
                           {activity.dueDate && (
-                            <span>Due: {activity.dueDate}</span>
-                          )}
-                          {activity.details && (
-                            <span className="truncate">
-                              From: {activity.details.substring(0, 30)}...
+                            <span className="text-xs text-gray-500 whitespace-nowrap">
+                              Due: {activity.dueDate}
                             </span>
                           )}
                         </div> 
+                        {activity.details && (
+                          <div className="text-xs text-gray-500 truncate mt-1">
+                            From: {activity.details.substring(0, 50)}...
                       </div>
-                      <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 ml-3 flex-shrink-0">
                         <button
                           onClick={() => activity.id && onMarkDone(activity.id)}
                           title="Mark as Done"
@@ -1169,13 +1629,6 @@ const SalesDetailBody = ({
                         >
                           <FaCheck size={14} />
                         </button>
-                        {/* <button
-                          onClick={() => onEditActivity(activity)}
-                          title="Edit"
-                          className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-                        >
-                          <FaPencilAlt size={14} />
-                        </button> */}
                         <button
                           onClick={() =>
                             activity.id && onDeleteActivity(activity.id)
@@ -1185,8 +1638,6 @@ const SalesDetailBody = ({
                         >
                           <FaTimes size={14} />
                         </button>
-                      </div>
-                      
                       </div>
                     </div>
                   ))
@@ -1226,17 +1677,28 @@ const SalesDetailBody = ({
                         open={salesDropdownOpen}
                         onOpenChange={setSalesDropdownOpen}
                         onValueChange={async (val) => {
+                          console.log("Sales Rep dropdown changed to:", val);
+                          let newSalesRepId = "";
+                          let newSalesRepName = "";
+                          
                           if (val === "unassigned") {
-                            setAssignedSalesRep("");
-                            setAssignedSalesRepId("");
+                            newSalesRepId = "";
+                            newSalesRepName = "";
                             setSalesDropdownOpen(true); // Keep dropdown open for unassigned
                           } else {
                             const selectedEmployee = managerEmployees.find((emp) => emp.employeeId === val);
-                            setAssignedSalesRep(selectedEmployee?.name || "");
-                            setAssignedSalesRepId(val);
+                            console.log("Selected employee:", selectedEmployee);
+                            newSalesRepId = val;
+                            newSalesRepName = selectedEmployee?.name || "";
                             setSalesDropdownOpen(false); // Close dropdown when assigned
                           }
-                          await handleSaveTeam();
+                          
+                          // Update state
+                          setAssignedSalesRep(newSalesRepName);
+                          setAssignedSalesRepId(newSalesRepId);
+                          
+                          // Save with the new values
+                          await handleSaveTeamWithValues(newSalesRepId, assignedDesignerId);
                         }}
                       >
                         <SelectTrigger className="w-32 h-7 border-gray-300 text-xs rounded focus:ring-1 focus:ring-blue-400 focus:border-blue-400">
@@ -1275,17 +1737,28 @@ const SalesDetailBody = ({
                         open={designerDropdownOpen}
                         onOpenChange={setDesignerDropdownOpen}
                         onValueChange={async (val) => {
+                          console.log("Designer dropdown changed to:", val);
+                          let newDesignerId = "";
+                          let newDesignerName = "";
+                          
                           if (val === "unassigned") {
-                            setAssignedDesigner("");
-                            setAssignedDesignerId("");
+                            newDesignerId = "";
+                            newDesignerName = "";
                             setDesignerDropdownOpen(true); // Keep dropdown open for unassigned
                           } else {
                             const selectedEmployee = managerEmployees.find((emp) => emp.employeeId === val);
-                            setAssignedDesigner(selectedEmployee?.name || "");
-                            setAssignedDesignerId(val);
+                            console.log("Selected designer:", selectedEmployee);
+                            newDesignerId = val;
+                            newDesignerName = selectedEmployee?.name || "";
                             setDesignerDropdownOpen(false); // Close dropdown when assigned
                           }
-                          await handleSaveTeam();
+                          
+                          // Update state
+                          setAssignedDesigner(newDesignerName);
+                          setAssignedDesignerId(newDesignerId);
+                          
+                          // Save with the new values
+                          await handleSaveTeamWithValues(assignedSalesRepId, newDesignerId);
                         }}
                       >
                         <SelectTrigger className="w-32 h-7 border-gray-300 text-xs rounded focus:ring-1 focus:ring-blue-400 focus:border-blue-400">
@@ -1316,15 +1789,15 @@ const SalesDetailBody = ({
                  <div>
                    <label className="block text-xs font-medium text-gray-500 mb-0">Full Name</label>
                    {contactEditingField === 'name' ? (
-                     <input
-                       value={contactFields.name}
-                       onChange={(e) => handleContactFieldChange("name", e.target.value)}
+                  <input
+                    value={contactFields.name}
+                    onChange={(e) => handleContactFieldChange("name", e.target.value)}
                        className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                        autoFocus
-                       onBlur={async () => { setContactEditingField(null); await handleSaveContact(); }}
-                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
-                       placeholder="Full Name"
-                     />
+                    onBlur={async () => { setContactEditingField(null); await handleSaveContact(); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    placeholder="Full Name"
+                  />
                    ) : (
                      <div className="flex items-center gap-3 text-gray-900 font-semibold cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors" onClick={() => { setContactEditingField('name'); }}>
                        <FaUser className="text-gray-400" />
@@ -1335,20 +1808,20 @@ const SalesDetailBody = ({
                  <div>
                    <label className="block text-xs font-medium text-gray-500 mb-0">Email Address</label>
                    {contactEditingField === 'email' ? (
-                     <input
-                       value={contactFields.email}
-                       onChange={(e) => handleContactFieldChange("email", e.target.value)}
+                  <input
+                    value={contactFields.email}
+                    onChange={(e) => handleContactFieldChange("email", e.target.value)}
                        className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                        autoFocus
-                       onBlur={async () => { setContactEditingField(null); await handleSaveContact(); }}
-                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
-                       placeholder="Email (Optional)"
-                     />
+                    onBlur={async () => { setContactEditingField(null); await handleSaveContact(); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    placeholder="Email (Optional)"
+                  />
                    ) : (
                      <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors" onClick={() => { setContactEditingField('email'); }}>
-                       <FaEnvelope className="text-gray-400" />
-                       <span className="text-gray-900 font-medium">{(contactFields.email || "").trim() || "(click to add)"}</span>
-                     </div>
+                    <FaEnvelope className="text-gray-400" />
+                    <span className="text-gray-900 font-medium">{(contactFields.email || "").trim() || "(click to add)"}</span>
+                  </div>
                    )}
                  </div>
                  <div>
@@ -1365,11 +1838,11 @@ const SalesDetailBody = ({
                      />
                    ) : (
                      <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors" onClick={() => { setContactEditingField('contactNumber'); }}>
-                       <FaPhone className="text-gray-400" />
-                       <span className="text-gray-900 font-medium">
-                         {contactFields.contactNumber ? `+91 ${contactFields.contactNumber}` : "(click to add)"}
-                       </span>
-                     </div>
+                    <FaPhone className="text-gray-400" />
+                    <span className="text-gray-900 font-medium">
+                      {contactFields.contactNumber ? `+91 ${contactFields.contactNumber}` : "(click to add)"}
+                    </span>
+                  </div>
                    )}
                  </div>
                  <div>
@@ -1386,12 +1859,12 @@ const SalesDetailBody = ({
                      />
                    ) : (
                      <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors" onClick={() => { setContactEditingField('alternateContactNumber'); }}>
-                       <FaPhone className="text-gray-400" />
-                       <span className="text-gray-900 font-medium">
+                    <FaPhone className="text-gray-400" />
+                    <span className="text-gray-900 font-medium">
                          {contactFields.alternateContactNumber ? `+91 ${contactFields.alternateContactNumber}` : "(click to add)"}
-                       </span>
-                     </div>
-                   )}
+                    </span>
+                </div>
+              )}
                  </div>
                </div>
             </div>
@@ -1413,16 +1886,6 @@ const SalesDetailBody = ({
                   label: "Area (sq. ft.)",
                   field: "area",
                   type: "number",
-                },
-                {
-                  label: "Design Timeline",
-                  field: "designTimeline",
-                  type: "text",
-                },
-                {
-                  label: "Completion Timeline",
-                  field: "completionTimeline",
-                  type: "text",
                 },
                 {
                   label: "Lead Source",
@@ -1550,7 +2013,65 @@ const SalesDetailBody = ({
               )}
           </div>
 
-            {/* Contacted Section moved here above Potential */}
+            {/* Section Navigation */}
+            <div className="border-t border-gray-200 my-6"></div>
+            <div className="mb-6">
+              {/* Section Progress Indicator */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  {sections.map((section, index) => (
+                    <div key={section.id} className="flex items-center gap-2">
+                      <button
+                        onClick={() => goToSection(index)}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          currentSection === index
+                            ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                            : index < currentSection
+                            ? 'bg-green-100 text-green-700 border border-green-200'
+                            : 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200'
+                        }`}
+                      >
+                        <span className="text-sm">{section.icon}</span>
+                        <span>{section.name}</span>
+                      </button>
+                      {index < sections.length - 1 && (
+                        <div className={`w-8 h-0.5 ${
+                          index < currentSection ? 'bg-green-300' : 'bg-gray-200'
+                        }`}></div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Navigation Buttons */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={prevSection}
+                    disabled={currentSection === 0}
+                    className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="Previous Section"
+                  >
+                    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={nextSection}
+                    disabled={currentSection === sections.length - 1}
+                    className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="Next Section"
+                  >
+                    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Contacted Section */}
+            {currentSection === 0 && (
+            <>
             <div className="border-t border-gray-200 my-6"></div>
             <div className="mb-6">
               <h4 className="text-sm font-semibold text-gray-700 mb-3">Contacted</h4>
@@ -1558,7 +2079,7 @@ const SalesDetailBody = ({
                 <div className="flex flex-col">
                   <span className="text-xs text-gray-500 mb-1">Floor Plan</span>
                   <div className="relative">
-                    <input
+                  <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf,.svg"
                       onChange={(e) => {
@@ -1576,7 +2097,7 @@ const SalesDetailBody = ({
                       </div>
                     )}
                   </div>
-                </div>
+                  </div>
                 <div className="flex flex-col">
                   <span className="text-xs text-gray-500 mb-1">First Call Date</span>
                   <input
@@ -1603,8 +2124,12 @@ const SalesDetailBody = ({
                               </div>
           </div>
         </div>
+            </>
+            )}
 
             {/* Potential Section */}
+            {currentSection === 1 && (
+            <>
             <div className="border-t border-gray-200 my-6"></div>
             <div className="mb-2">
               <h4 className="text-sm font-semibold text-gray-700 mb-3">Potential</h4>
@@ -1648,13 +2173,414 @@ const SalesDetailBody = ({
               </div>
                 </div>
                 </div>
+            </>
+            )}
+
+            {/* High Potential Section */}
+            {currentSection === 2 && (
+            <>
+            <div className="border-t border-gray-200 my-6"></div>
+            <div className="mb-2">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">High Potential</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Quotation Details <span className="text-red-500">*</span></span>
+                  <textarea
+                    value={highPotentialFields.requirements || ""}
+                    onChange={(e) => handleHighPotentialFieldChange('requirements', e.target.value)}
+                    onBlur={() => saveHighPotentialField('requirements')}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none"
+                    placeholder="Enter detailed quotation information..."
+                    rows="3"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Final Quoted Amount <span className="text-red-500">*</span></span>
+                  <input
+                    type="number"
+                    value={highPotentialFields.finalQuotation || ""}
+                    onChange={(e) => handleHighPotentialFieldChange('finalQuotation', e.target.value)}
+                    onBlur={() => saveHighPotentialField('finalQuotation')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Discount Percentage <span className="text-red-500">*</span></span>
+                  <input
+                    type="number"
+                    value={highPotentialFields.discount || ""}
+                    onChange={(e) => handleHighPotentialFieldChange('discount', e.target.value)}
+                    onBlur={() => saveHighPotentialField('discount')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="0"
+                    min="0"
+                    max="100"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Design Timeline <span className="text-red-500">*</span></span>
+                  <input
+                    type="text"
+                    value={highPotentialFields.designTimeline || ""}
+                    onChange={(e) => handleHighPotentialFieldChange('designTimeline', e.target.value)}
+                    onBlur={() => saveHighPotentialField('designTimeline')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="e.g., 2-3 weeks"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Completion Timeline <span className="text-red-500">*</span></span>
+                  <input
+                    type="text"
+                    value={highPotentialFields.completionTimeline || ""}
+                    onChange={(e) => handleHighPotentialFieldChange('completionTimeline', e.target.value)}
+                    onBlur={() => saveHighPotentialField('completionTimeline')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="e.g., 3-4 months"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+            </>
+            )}
+
+            {/* Semi Converted Section */}
+            {currentSection === 3 && (
+            <>
+            <div className="border-t border-gray-200 my-6"></div>
+            <div className="mb-2">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Semi Converted</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Freezing Amount <span className="text-red-500">*</span></span>
+                  <input
+                    type="number"
+                    value={semiConvertedFields.freezingAmount || ""}
+                    onChange={(e) => handleSemiConvertedFieldChange('freezingAmount', e.target.value)}
+                    onBlur={() => saveSemiConvertedField('freezingAmount')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="0"
+                    required
+                  />
+          </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Payment Date <span className="text-red-500">*</span></span>
+                  <input
+                    type="date"
+                    value={semiConvertedFields.freezingPaymentDate || ""}
+                    onChange={(e) => handleSemiConvertedFieldChange('freezingPaymentDate', e.target.value)}
+                    onBlur={() => saveSemiConvertedField('freezingPaymentDate')}
+                    max={new Date().toISOString().split('T')[0]}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Payment Mode <span className="text-red-500">*</span></span>
+                  <select
+                    value={semiConvertedFields.freezingPaymentMode || ""}
+                    onChange={(e) => handleSemiConvertedFieldChange('freezingPaymentMode', e.target.value)}
+                    onBlur={() => saveSemiConvertedField('freezingPaymentMode')}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    required
+                  >
+                    <option value="">Select payment mode</option>
+                    <option value="cash">💵 Cash</option>
+                    <option value="cheque">🏦 Cheque</option>
+                    <option value="upi">📱 UPI</option>
+                    <option value="bank_transfer">🏛️ Bank Transfer</option>
+                    <option value="card">💳 Card</option>
+                    <option value="online">🌐 Online</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Payment Proof <span className="text-red-500">*</span></span>
+                  <div className="border-2 border-dashed border-gray-300 rounded-md p-3 text-center hover:border-blue-400 transition-colors">
+                    <input
+                      type="file"
+                      onChange={handleFreezingProofFileChange}
+                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                      className="hidden"
+                      id="freezing-proof-file"
+                    />
+                    <label htmlFor="freezing-proof-file" className="cursor-pointer block">
+                      <div className="mx-auto text-blue-400 text-lg mb-1">📁</div>
+                      <p className="text-xs text-gray-600">
+                        {freezingProofFile ? freezingProofFile.name : "Click to upload proof"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        PDF, JPG, PNG, DOC files
+                      </p>
+                    </label>
+                  </div>
+                  {freezingProofFile && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <p className="text-xs text-green-600">
+                        ✓ {freezingProofFile.name} selected
+                      </p>
+                      <button
+                        onClick={saveFreezingProofFile}
+                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Upload
+                      </button>
+                    </div>
+                  )}
+              </div>
+                              </div>
+            </div>
+            </>
+            )}
+
+            {/* Converted Section */}
+            {currentSection === 4 && (
+            <>
+            <div className="border-t border-gray-200 my-6"></div>
+            <div className="mb-2">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Converted</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Sign-up Amount (₹) <span className="text-red-500">*</span></span>
+                  <input
+                    type="number"
+                    value={convertedFields.signupAmount || ""}
+                    onChange={(e) => handleConvertedFieldChange('signupAmount', e.target.value)}
+                    onBlur={() => saveConvertedField('signupAmount')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Payment Date <span className="text-red-500">*</span></span>
+                  <input
+                    type="date"
+                    value={convertedFields.paymentDate || ""}
+                    onChange={(e) => handleConvertedFieldChange('paymentDate', e.target.value)}
+                    onBlur={() => saveConvertedField('paymentDate')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Payment Mode <span className="text-red-500">*</span></span>
+                  <select
+                    value={convertedFields.paymentMode || ""}
+                    onChange={(e) => handleConvertedFieldChange('paymentMode', e.target.value)}
+                    onBlur={() => saveConvertedField('paymentMode')}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    required
+                  >
+                    <option value="">Select payment mode</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Debit Card">Debit Card</option>
+                    <option value="Credit Card">Credit Card</option>
+                    <option value="IMPS/NEFT">IMPS/NEFT</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Payment Transaction ID</span>
+                  <input
+                    type="text"
+                    value={convertedFields.paymentTransactionId || ""}
+                    onChange={(e) => handleConvertedFieldChange('paymentTransactionId', e.target.value)}
+                    onBlur={() => saveConvertedField('paymentTransactionId')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="Enter transaction ID"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">PAN Number</span>
+                  <input
+                    type="text"
+                    value={convertedFields.panNumber || ""}
+                    onChange={(e) => handleConvertedFieldChange('panNumber', e.target.value.toUpperCase())}
+                    onBlur={() => saveConvertedField('panNumber')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="ABCDE1234F"
+                  />
+                </div>
+              </div>
+
+              {/* GST Section */}
+              <div className="mt-4">
+                <div className="flex items-center mb-3">
+                  <input
+                    type="checkbox"
+                    id="gstAvailable"
+                    checked={convertedFields.gstAvailable}
+                    onChange={(e) => handleConvertedFieldChange('gstAvailable', e.target.checked)}
+                    onBlur={() => saveConvertedField('gstAvailable')}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="gstAvailable" className="ml-2 block text-sm font-medium text-gray-700">
+                    GST is available
+                  </label>
+                </div>
+                
+                {convertedFields.gstAvailable && (
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500 mb-1">GST Number</span>
+                    <input
+                      type="text"
+                      value={convertedFields.gst || ""}
+                      onChange={(e) => handleConvertedFieldChange('gst', e.target.value.toUpperCase())}
+                      onBlur={() => saveConvertedField('gst')}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                      className="w-full p-2 border rounded-md focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      placeholder="22AAAAA0000A1Z5"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Format: 22AAAAA0000A1Z5 (15 characters)</p>
+                  </div>
+                )}
+              </div>
+
+              {/* File Upload Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Upload Payment Proof</span>
+                  <div className="border-2 border-dashed border-gray-300 rounded-md p-3 text-center hover:border-blue-400 transition-colors">
+                    <input
+                      type="file"
+                      onChange={handlePaymentDetailsFileChange}
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      className="hidden"
+                      id="payment-details-file"
+                    />
+                    <label htmlFor="payment-details-file" className="cursor-pointer block">
+                      <div className="mx-auto text-blue-400 text-lg mb-1">📁</div>
+                      <p className="text-xs text-gray-600">
+                        {paymentDetailsFile ? paymentDetailsFile.name : "Click to upload payment proof"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        PDF, JPG, PNG files
+                      </p>
+                    </label>
+                  </div>
+                  {paymentDetailsFile && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <p className="text-xs text-green-600">
+                        ✓ {paymentDetailsFile.name} selected
+                      </p>
+                      <button
+                        onClick={savePaymentDetailsFile}
+                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Upload
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500 mb-1">Upload Booking Form</span>
+                  <div className="border-2 border-dashed border-gray-300 rounded-md p-3 text-center hover:border-blue-400 transition-colors">
+                    <input
+                      type="file"
+                      onChange={handleBookingFormFileChange}
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      className="hidden"
+                      id="booking-form-file"
+                    />
+                    <label htmlFor="booking-form-file" className="cursor-pointer block">
+                      <div className="mx-auto text-blue-400 text-lg mb-1">📁</div>
+                      <p className="text-xs text-gray-600">
+                        {bookingFormFile ? bookingFormFile.name : "Click to upload booking form"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        PDF, JPG, PNG files
+                      </p>
+                    </label>
+                  </div>
+                  {bookingFormFile && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <p className="text-xs text-green-600">
+                        ✓ {bookingFormFile.name} selected
+                      </p>
+                      <button
+                        onClick={saveBookingFormFile}
+                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Upload
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Payment Terms Section */}
+              <div className="mt-6">
+                <h5 className="text-sm font-semibold text-gray-700 mb-3">Payment Terms</h5>
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                    <div className="grid grid-cols-12 gap-2 text-xs font-medium text-gray-700">
+                      <div className="col-span-2">Stage</div>
+                      <div className="col-span-2">%</div>
+                      <div className="col-span-8">Description</div>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-gray-200">
+                    {paymentTerms.map((term, index) => (
+                      <div key={index} className="px-3 py-2 hover:bg-gray-50">
+                        <div className="grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-2">
+                            <span className="text-xs text-gray-600">Stage {term.stage}</span>
+                          </div>
+                          <div className="col-span-2">
+                            <input
+                              type="number"
+                              value={term.percentage}
+                              onChange={(e) => handlePaymentTermChange(index, 'percentage', Number(e.target.value))}
+                              className="w-full p-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100"
+                              min="0"
+                              max="100"
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="col-span-8">
+                            <input
+                              type="text"
+                              value={term.description}
+                              onChange={(e) => handlePaymentTermChange(index, 'description', e.target.value)}
+                              className="w-full p-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100"
+                              placeholder="Enter description"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            </>
+            )}
+
             {/* Contact Details section duplicated earlier; removing this copy */}
-
+            </div>
 
           </div>
-          </div>
-
-        {/* Right Column */}
+                  {/* Right Column */}
         <div className="flex flex-col gap-6">
           {/* Call Summaries Section - Redesigned */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -1705,7 +2631,7 @@ const SalesDetailBody = ({
                         <span className="text-xs font-medium">{option.label}</span>
                       </button>
                     ))}
-                  </div>
+                </div>
                 </div>
 
                 {/* Summary Input Field */}
@@ -1737,8 +2663,8 @@ const SalesDetailBody = ({
                               <p className="text-xs text-gray-500">Due: {new Date(task.dueDate).toLocaleDateString()}</p>
                             )}
                           </div>
-                          <button
-                            type="button"
+                  <button
+                    type="button"
                             onClick={() => handleRemoveSummaryTask(task.id)}
                             className="text-red-500 hover:text-red-700 p-1"
                             title="Remove task"
@@ -1746,14 +2672,14 @@ const SalesDetailBody = ({
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                          </button>
-                        </div>
+                  </button>
+                </div>
                       ))}
-                    </div>
+              </div>
                   ) : !showTaskInput ? (
                     <div className="text-center py-3 text-xs text-gray-500 bg-gray-50 rounded-md border border-gray-200">
                       No Actions added yet. Click "+ Next Action" to add at least one.
-                    </div>
+            </div>
                   ) : null}
 
                     {/* Add Task Input */}
@@ -1770,14 +2696,14 @@ const SalesDetailBody = ({
                             placeholder="Enter task description..."
                             className="w-full px-3 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                           />
-                        </div>
-                        </div>
+                      </div>
+                    </div>
                         {/* Due Date and Buttons - Right Side */}
                         <div className="flex justify-end">
                           <div className="flex flex-col gap-2">
                                                       <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Due Date <span className="text-red-500">*</span></label>
-                            <input
+                          <input
                               type="date"
                               value={newTaskDueDate}
                               onChange={(e) => setNewTaskDueDate(e.target.value)}
@@ -1786,7 +2712,7 @@ const SalesDetailBody = ({
                             />
                           </div>
                             <div className="flex gap-2">
-                                                          <button
+                          <button
                               type="button"
                               onClick={handleAddSummaryTask}
                               disabled={!newTaskText.trim() || !newTaskDueDate}
@@ -1804,17 +2730,17 @@ const SalesDetailBody = ({
                                 className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs font-medium rounded-md transition-colors"
                               >
                                 Cancel
-                              </button>
-                            </div>
-                          </div>
+                          </button>
+                </div>
+              </div>
                         </div>
                       </div>
                     )}
-                  </div>
+          </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
-                  <button
+              <button
                     type="button"
                     onClick={handleAddOrEditNote}
                     disabled={notesLoading || !noteContent.trim() || !noteConvoType || summaryTasks.length === 0}
@@ -1836,10 +2762,10 @@ const SalesDetailBody = ({
                   
                   {/* <button
                     type="button"
-                    onClick={() => {
-                      setEditingActivity(null);
-                      setIsActivityModalOpen(true);
-                    }}
+                onClick={() => {
+                  setEditingActivity(null);
+                  setIsActivityModalOpen(true);
+                }}
                     className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-md transition-colors flex items-center gap-1"
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1850,13 +2776,13 @@ const SalesDetailBody = ({
                 </div>
               </div>
             )}
-          </div>
-
+            </div>
+            
           {/* Call History */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2.5">
             <div className="mb-2">
               <h3 className="text-md font-medium text-gray-900">Call History</h3>
-            </div>
+                        </div>
             
             <div className="space-y-2">
               {conversationGroups && conversationGroups.length > 0 ? (
@@ -1875,13 +2801,13 @@ const SalesDetailBody = ({
                             {c.type === 'PHONE_CALL' ? '📞' : 
                              c.type === 'MEETING' ? '🤝' :
                              c.type === 'EMAIL' ? '📧' : '🎥'}
-                          </span>
+                        </span>
                           <h4 className="font-semibold text-gray-900 text-sm">
                             {c.type === 'PHONE_CALL' ? 'Phone Call' : 
                              c.type === 'MEETING' ? 'Meeting' :
                              c.type === 'EMAIL' ? 'Email' : 'Video Call'}
                           </h4>
-                        </div>
+                      </div>
 
                         <div className="text-right">
                           <p className="text-xs text-gray-500">
@@ -1896,9 +2822,9 @@ const SalesDetailBody = ({
                       <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
                         {c.summary}
                       </p>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))
               ) : (
                 <div className="text-center py-6">
                   <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2">
@@ -1914,8 +2840,10 @@ const SalesDetailBody = ({
           </div>
 
 
-        </div>
       </div>
+          </div>
+
+
     </div>
   );
 };

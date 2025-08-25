@@ -72,7 +72,7 @@ const AddInvoiceForm = ({ onSubmit, onCancel }) => {
 
     useEffect(() => {
         if (!projectCustomerList || projectCustomerList.length === 0) {
-            dispatch(fetchProjectCustomerList());
+            dispatch(fetchProjectCustomerList(companyId));
         }
     }, [dispatch, projectCustomerList]);
 
@@ -276,7 +276,7 @@ const AddInvoiceForm = ({ onSubmit, onCancel }) => {
                                 onClick={() => setIsOpen(!isOpen)}
                                 className="w-full px-4 py-3 text-left bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                             >
-                                {selectedOption?.projectName || "Select Project"}
+                                {selectedOption?.projectName || "Select Project"||customerId}
                                 <span className="float-right">
                                     <svg className={`w-4 h-4 inline transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -752,4 +752,4 @@ const AddInvoiceForm = ({ onSubmit, onCancel }) => {
     );
 };
 
-export default AddInvoiceForm; 
+export default AddInvoiceForm;

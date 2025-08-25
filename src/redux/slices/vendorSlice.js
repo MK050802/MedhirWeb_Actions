@@ -316,13 +316,40 @@ export const fetchVendorPurchaseOrders = createAsyncThunk(
   }
 );
 
+// Fetch vendor tags
+export const fetchVendorTags = createAsyncThunk(
+  "vendor/fetchVendorTags",
+  async (companyId, { rejectWithValue }) => {
+    try {
+      const token = getItemFromSessionStorage("token", null);
+      const response = await fetch(
+        `${publicRuntimeConfig.apiURL}/api/vendorProfileTags/${companyId}/vendor-tag`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return rejectWithValue(data.message || "Something went wrong");
+      }
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.message || "Network Error");
+    }
+  }
+);
+
 export const vendorSlice = createSlice({
   name: "vendor",
   initialState: {
     vendors: [],
-    vendorBills: {}, // Store vendor bills by vendorId
-    vendorPayments: {}, // Store vendor payments by vendorId
-    vendorPurchaseOrders: {}, // Store vendor purchase orders by vendorId
+    vendorBills: {},
+    vendorPayments: {},
+    vendorPurchaseOrders: {},
+    vendorTags: [], // <-- Add this line
     loading: false,
     error: null,
   },
@@ -402,6 +429,17 @@ export const vendorSlice = createSlice({
       state.vendorPurchaseOrders[vendorId] = purchaseOrders;
     });
     builder.addCase(fetchVendorPurchaseOrders.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload;
+    });
+    builder.addCase(fetchVendorTags.pending, (state) => {
+      state.loading = true;
+    });
+    builder.addCase(fetchVendorTags.fulfilled, (state, action) => {
+      state.loading = false;
+      state.vendorTags = action.payload;
+    });
+    builder.addCase(fetchVendorTags.rejected, (state, action) => {
       state.loading = false;
       state.error = action.payload;
     });

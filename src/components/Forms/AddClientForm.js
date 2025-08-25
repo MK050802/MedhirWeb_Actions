@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FaSave, FaTimes, FaUsers, FaInfoCircle } from 'react-icons/fa';
 import { useDispatch } from 'react-redux';
 import { addCustomer } from '@/redux/slices/customerSlice';
 import { toast } from 'sonner';
 
-const AddClientForm = ({ onSubmit, onCancel }) => {
+const AddClientForm = ({ customer, onSubmit, onCancel }) => {
   const dispatch = useDispatch();
   const [formData, setFormData] = useState({
     customerName: '',
@@ -20,6 +20,25 @@ const AddClientForm = ({ onSubmit, onCancel }) => {
       state: ''
     }
   });
+
+  useEffect(() => {
+    if (customer) {
+      setFormData({
+        customerName: customer.customerName || '',
+        companyName: customer.companyName || '',
+        email: customer.email || '',
+        contactNumber: customer.contactNumber || '',
+        projectId: customer.projectId || '',
+        address: customer.address || '',
+        gst: customer.gst || '',
+        addressDetails: {
+          address: customer.addressDetails?.address || customer.address || '',
+          city: customer.addressDetails?.city || '',
+          state: customer.addressDetails?.state || ''
+        }
+      });
+    }
+  }, [customer]);
 
   const [errors, setErrors] = useState({});
   const indianStates = ['Maharashtra', 'Karnataka', 'Delhi', 'Tamil Nadu', 'Uttar Pradesh', 'Gujarat', 'Rajasthan', 'Madhya Pradesh', 'West Bengal', 'Andhra Pradesh', 'Telangana', 'Kerala', 'Punjab', 'Haryana', 'Bihar', 'Odisha', 'Assam', 'Jharkhand', 'Chhattisgarh', 'Uttarakhand', 'Himachal Pradesh', 'Tripura', 'Meghalaya', 'Manipur', 'Nagaland', 'Goa', 'Arunachal Pradesh', 'Mizoram', 'Sikkim'];
@@ -94,6 +113,9 @@ const AddClientForm = ({ onSubmit, onCancel }) => {
     e.preventDefault();
     if (validateForm()) {
       try {
+        // Get companyId from sessionStorage or props
+        const companyId = sessionStorage.getItem("employeeCompanyId") || customer?.companyId || "";
+
         // Prepare the data according to the API structure
         const customerData = {
           customerName: formData.customerName,
@@ -102,6 +124,8 @@ const AddClientForm = ({ onSubmit, onCancel }) => {
           contactNumber: formData.contactNumber,
           projectId: formData.projectId.trim() || '',
           address: formData.address,
+          gst: formData.gst,
+          companyId, // <-- Add companyId here
           addressDetails: {
             address: formData.addressDetails.address || formData.address,
             city: formData.addressDetails.city,
@@ -267,4 +291,4 @@ const AddClientForm = ({ onSubmit, onCancel }) => {
     </form>
   );
 };
-export default AddClientForm; 
+export default AddClientForm;

@@ -52,6 +52,7 @@
     "lucide-react": "^0.474.0",
     "mongoose": "^8.9.5",
     "next": "^15.3.1",
+    "pdfjs-dist": "^5.4.54",
     "prop-types": "^15.8.1",
     "react": "^19.1.0",
     "react-cache-buster": "^0.1.8",

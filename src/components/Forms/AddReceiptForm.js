@@ -108,7 +108,7 @@ const dispatch = useDispatch();
 }, [initialData]);
 
 useEffect(() => {
-  dispatch(fetchProjectCustomerList());
+  dispatch(fetchProjectCustomerList(companyId));
 }, [dispatch]);
 
 // Calculate project-specific receipt data when receiptsByProject changes
@@ -234,7 +234,6 @@ const handleSubmit = async (e) => {
   e.preventDefault();
   if (validateForm()) {
     try {
-      // Generate the actual receipt number (this will increment the counter)
       let finalReceiptNumber = formData.receiptNumber;
       if (companyId) {
         try {
@@ -242,16 +241,15 @@ const handleSubmit = async (e) => {
           finalReceiptNumber = result.nextReceiptNumber;
         } catch (error) {
           console.error('Failed to generate receipt number:', error);
-          // Continue with the current number if generation fails
         }
       }
-      
-      // Create receipt data object - only include fields that DTO expects
+
+      // Add companyId to receiptData
       const receiptData = {
         customerId: formData.customerId,
         projectId: formData.leadId,
         amountReceived: parseFloat(formData.amount),
-        linkedInvoices: [], // Empty array since invoice linking is removed
+        linkedInvoices: [],
         receiptDate: formData.receiptDate,
         paymentMethod: formData.paymentMethod,
         receiptNumber: finalReceiptNumber,
@@ -260,29 +258,20 @@ const handleSubmit = async (e) => {
           formData.chequeNumber ||
           formData.upiTransactionId ||
           '',
-        bankAccountId: formData.bankAccount || null, // Add if your DTO has this field
+        bankAccountId: formData.bankAccount || null,
+        companyId: companyId, // <-- Add this line
       };
-      
-      // Always send as FormData since backend expects multipart form data
+
       const formDataToSend = new FormData();
-      
-      // Append receipt data as a JSON string (like bill endpoint)
       formDataToSend.append('receipt', JSON.stringify(receiptData));
-      
-      // Add file if selected - updated to use uploadedFile
       if (uploadedFile) {
         formDataToSend.append('file', uploadedFile);
       }
-      
+
       await dispatch(addReceipt(formDataToSend)).unwrap();
-      
-      // Debug: Log the data being sent
-      console.log('Receipt Data being sent:', receiptData);
-      console.log('Payment Proof:', uploadedFile);
       toast.success('Receipt added successfully!');
-      // Add small delay to prevent duplicate messages
       setTimeout(() => {
-        if (onSubmit) onSubmit(); // Notify parent to refresh UI and close form
+        if (onSubmit) onSubmit();
       }, 100);
     } catch (error) {
       console.error('Receipt submission error:', error);
@@ -647,4 +636,4 @@ const handleSubmit = async (e) => {
   );
 };
 
-export default AddReceiptForm; 
+export default AddReceiptForm;

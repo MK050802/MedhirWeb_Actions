@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { FaFileInvoice, FaUniversity, FaTags, FaPlus, FaTrash } from 'react-icons/fa';
 import MainLayout from '@/components/MainLayout';
 import { toast } from 'sonner';
 import getConfig from 'next/config';
 import { getItemFromSessionStorage } from '@/redux/slices/sessionStorageSlice';
-
+import {
+  fetchVendorTags,
+  addVendorTag,
+  deleteVendorTag
+} from '@/redux/slices/VendorTagSlice';
 const { publicRuntimeConfig } = getConfig();
 
 const DocumentSettings = ({ settings, onSettingsChange, onSaveChanges, isSaving }) => {
@@ -612,7 +617,7 @@ const VendorTagsSettings = ({ vendorTags, onAddTag, onRemoveTag }) => {
       return; 
     }
 
-    if (vendorTags.some(tag => tag.toLowerCase() === newTag.name.trim().toLowerCase())) {
+    if (vendorTags.some(tag => tag.tagName.toLowerCase() === newTag.name.trim().toLowerCase())) {
       toast.error('This tag already exists');
       return;
     }
@@ -671,24 +676,29 @@ const VendorTagsSettings = ({ vendorTags, onAddTag, onRemoveTag }) => {
               <p className="text-xs text-gray-400">Add your first vendor tag above</p>
             </div>
           ) : (
-            vendorTags.map((tag, index) => (
-              <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <div className="flex-1">
-                  <span className="text-sm font-medium text-gray-700">{tag}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded"
-                    title="Delete Tag"
-                    onClick={() => handleRemoveTag(tag)}
-                  >
-                    <FaTrash />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
+    vendorTags.map((tag, index) => (
+      <div
+        key={tag.tagId || index}
+        className="flex justify-between items-center p-2 bg-gray-50 rounded"
+      >
+        <div className="flex-1">
+          <span className="text-sm font-medium text-gray-700">
+            {tag.tagName}
+          </span>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded"
+            title="Delete Tag"
+            onClick={() => handleRemoveTag(tag.tagId)}
+          >
+            <FaTrash />
+          </button>
+        </div>
+      </div>
+    ))
+  )}
+</div>
 
         {/* Help Text */}
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -738,7 +748,8 @@ const AccountSettingsPage = () => {
   });
 
   const [bankAccounts, setBankAccounts] = useState([]);
-  const [vendorTags, setVendorTags] = useState([]);
+  const dispatch = useDispatch();
+const { tags: vendorTags, loading: vendorTagsLoading, error: vendorTagsError } = useSelector(state => state.vendorTags);
 
   const handleDocumentSettingsChange = (key, value) => {
     setDocumentSettings(prev => ({ ...prev, [key]: value }));
@@ -925,86 +936,30 @@ const AccountSettingsPage = () => {
   };
 
   const handleAddVendorTag = async (newTag) => {
+    const companyId = resolveCompanyId();
+    if (!companyId) {
+      toast.error('Company ID not found.');
+      return;
+    }
     try {
-      const companyId = resolveCompanyId();
-      if (!companyId) {
-        toast.error('Company ID not found.');
-        return;
-      }
-      const token = getItemFromSessionStorage('token', null);
-      if (!token) {
-        toast.error('You are not signed in. Please sign in again.');
-        return;
-      }
-
-      const payload = {
-        companyId,
-        tag: newTag
-      };
-
-      const res = await fetch(`${publicRuntimeConfig.apiURL}/api/settings/account/company/${companyId}?companyId=${companyId}`, {
-        method: 'POST',
-        headers: buildAuthHeaders(token),
-        body: JSON.stringify(payload),
-      });
-
-      if (res.status === 401) {
-        toast.error('Authentication required. Please sign in again.');
-        return;
-      }
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || 'Failed to add vendor tag');
-      }
-
-      // Add to local state after successful API call
-      setVendorTags(prev => [...prev, newTag]);
+      await dispatch(addVendorTag({ companyId, tagName: newTag })).unwrap();
       toast.success('Vendor tag added successfully!');
     } catch (error) {
-      toast.error(`Failed to add vendor tag: ${error.message || 'Unknown error'}`);
+      toast.error(`Failed to add vendor tag: ${error}`);
     }
   };
 
   const handleRemoveVendorTag = async (tagToRemove) => {
+    const companyId = resolveCompanyId();
+    if (!companyId) {
+      toast.error('Company ID not found.');
+      return;
+    }
     try {
-      const companyId = resolveCompanyId();
-      if (!companyId) {
-        toast.error('Company ID not found.');
-        return;
-      }
-      const token = getItemFromSessionStorage('token', null);
-      if (!token) {
-        toast.error('You are not signed in. Please sign in again.');
-        return;
-      }
-
-      const payload = {
-        companyId,
-        tag: tagToRemove
-      };
-
-      const res = await fetch(`${publicRuntimeConfig.apiURL}/api/settings/account/company/${companyId}?companyId=${companyId}`, {
-        method: 'DELETE',
-        headers: buildAuthHeaders(token),
-        body: JSON.stringify(payload),
-      });
-
-      if (res.status === 401) {
-        toast.error('Authentication required. Please sign in again.');
-        return;
-      }
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || 'Failed to remove vendor tag');
-      }
-
-      // Remove from local state after successful API call
-      setVendorTags(prev => prev.filter(tag => tag !== tagToRemove));
+      await dispatch(deleteVendorTag({ companyId, tagId: tagToRemove })).unwrap();
       toast.success('Vendor tag removed successfully!');
     } catch (error) {
-      toast.error(`Failed to remove vendor tag: ${error.message || 'Unknown error'}`);
+      toast.error(`Failed to remove vendor tag: ${error}`);
     }
   };
 
@@ -1112,6 +1067,13 @@ const AccountSettingsPage = () => {
       }
     };
     fetchSettings();
+  }, []);
+
+  useEffect(() => {
+    const companyId = resolveCompanyId();
+    if (companyId) {
+      dispatch(fetchVendorTags(companyId));
+    }
   }, []);
 
   const handleSaveChanges = async () => {
@@ -1241,4 +1203,4 @@ const AccountSettingsPage = () => {
   );
 };
 
-export default AccountSettingsPage; 
+export default AccountSettingsPage;

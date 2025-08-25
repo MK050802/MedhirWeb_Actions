@@ -5,7 +5,7 @@ import { addVendor, updateVendor } from '../../redux/slices/vendorSlice';
 import { toast } from 'sonner';
 import VendorPreview from '../Previews/VendorPreview';
 import FileUploadWithPreview from '../ui/FileUploadWithPreview';
-
+import { fetchVendorTags } from '../../redux/slices/VendorTagSlice';
 const steps = [
   { label: 'Basic Details' },
   { label: 'Contact & Address' },
@@ -16,6 +16,7 @@ const steps = [
 const AddVendorForm = ({ vendor, onSubmit, onCancel }) => {
   const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.vendors);
+  const { tags: vendorTags, loading: vendorTagsLoading } = useSelector(state => state.vendorTags);
   const [step, setStep] = useState(1);
   const formRef = useRef(null);
   const [isAtBottom, setIsAtBottom] = useState(false);
@@ -169,11 +170,6 @@ const AddVendorForm = ({ vendor, onSubmit, onCancel }) => {
   const accountOptions = [
     'Account Payable - Domestic', 'Account Payable - Import', 'Account Receivable - Domestic',
     'Account Receivable - Export', 'Sundry Creditors', 'Sundry Debtors'
-  ];
-
-  const vendorTagOptions = [
-    'Critical Supplier', 'Preferred Vendor', 'Local Supplier', 'International Supplier',
-    'Service Provider', 'Raw Material Supplier', 'Equipment Supplier', 'Contractor'
   ];
 
   const contactTypes = ['Billing', 'Shipping', 'Finance', 'Technical', 'Sales', 'Support'];
@@ -707,21 +703,23 @@ const AddVendorForm = ({ vendor, onSubmit, onCancel }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (validateForm()) {
       const submitData = {
         ...formData,
-        vendorId: vendor?.vendorId || `V${Date.now()}`, // Use existing ID or generate new
+        vendorId: vendor?.vendorId || `V${Date.now()}`,
         status: 'Active',
         createdAt: vendor?.createdAt || new Date().toISOString(),
         updatedAt: isEditMode ? new Date().toISOString() : undefined,
-        // Convert tdsPercentage to double type
         tdsPercentage: formData.tdsPercentage ? parseFloat(formData.tdsPercentage) : null,
-        // Include file objects for backend - updated to use uploadedFiles
         gstDocument: uploadedFiles.gstDocument,
-        bankPassbook: uploadedFiles.bankPassbook
+        bankPassbook: uploadedFiles.bankPassbook,
+        vendorTag: formData.vendorTags, // <-- This line maps selected tags to backend field
       };
-      
+
+      // Remove vendorTags from submitData if backend does not expect it
+      delete submitData.vendorTags;
+
       try {
         if (isEditMode) {
           const result = await dispatch(updateVendor(submitData)).unwrap();
@@ -742,7 +740,6 @@ const AddVendorForm = ({ vendor, onSubmit, onCancel }) => {
         toast.error(err);
       }
     } else {
-      // Show specific validation errors instead of general message
       const errorMessages = Object.values(errors).filter(msg => msg);
       if (errorMessages.length > 0) {
         toast.error(`Please fix the following errors: ${errorMessages.slice(0, 3).join(', ')}${errorMessages.length > 3 ? ' and more...' : ''}`);
@@ -849,17 +846,23 @@ const AddVendorForm = ({ vendor, onSubmit, onCancel }) => {
                 </button>
                 {showTagsDropdown && (
                   <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
-                    {vendorTagOptions.map(tag => (
-                      <label key={tag} className="flex items-center w-full px-4 py-2 hover:bg-gray-100 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="form-checkbox h-4 w-4 text-blue-600 rounded"
-                          checked={formData.vendorTags.includes(tag)}
-                          onChange={() => handleMultiSelect('vendorTags', tag)}
-                        />
-                        <span className="ml-3 text-sm text-gray-700">{tag}</span>
-                      </label>
-                    ))}
+                    {vendorTagsLoading ? (
+  <div className="px-4 py-2 text-gray-500">Loading tags...</div>
+) : vendorTags.length === 0 ? (
+  <div className="px-4 py-2 text-gray-400">No tags found</div>
+) : (
+  vendorTags.map(tagObj => (
+    <label key={tagObj.tagId} className="flex items-center w-full px-4 py-2 hover:bg-gray-100 cursor-pointer">
+      <input
+        type="checkbox"
+        className="form-checkbox h-4 w-4 text-blue-600 rounded"
+        checked={formData.vendorTags.includes(tagObj.tagName)}
+        onChange={() => handleMultiSelect('vendorTags', tagObj.tagName)}
+      />
+      <span className="ml-3 text-sm text-gray-700">{tagObj.tagName}</span>
+    </label>
+  ))
+)}
                   </div>
                 )}
               </div>
@@ -1518,6 +1521,12 @@ const AddVendorForm = ({ vendor, onSubmit, onCancel }) => {
       });
     };
   }, []);
+  useEffect(() => {
+    const companyId = sessionStorage.getItem("employeeCompanyId");
+    if (companyId) {
+      dispatch(fetchVendorTags(companyId));
+    }
+  }, [dispatch]);
 
   return (
     <form ref={formRef} className="w-full bg-white border border-gray-200 shadow-lg p-0 flex flex-col relative pb-6">
